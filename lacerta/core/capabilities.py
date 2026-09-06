@@ -197,6 +197,8 @@ def run_recipe(
             error=f"unknown recipe {recipe_id!r}",
         )
     artifacts: list[str] = []
+    last_summary = "Recipe complete."
+    metrics: dict[str, Any] = {"recipe_id": recipe_id}
     for cap_id in recipe.capability_ids:
         result = run_capability(cap_id, ctx, args_for(cap_id, job, ctx))
         if not result.ok:
@@ -207,6 +209,10 @@ def run_recipe(
                 error=result.error_message,
                 metrics={"failed_capability": cap_id},
             )
+        if result.summary:
+            last_summary = result.summary
+        if ctx_val := result.data.get("context"):
+            metrics["context"] = str(ctx_val)
         if path := result.data.get("path"):
             artifacts.append(str(path))
         for key in ("syllabus_path", "course_path", "notes_path", "report_path"):
@@ -215,7 +221,7 @@ def run_recipe(
     return JobResult(
         job_id=job.job_id,
         ok=True,
-        summary="Recipe complete.",
+        summary=last_summary,
         artifacts=artifacts,
-        metrics={"recipe_id": recipe_id},
+        metrics=metrics,
     )

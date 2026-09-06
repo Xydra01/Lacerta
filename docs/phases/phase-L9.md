@@ -1,9 +1,10 @@
 # Phase L9 — MCP host (stdio meta-tools → manager)
 
-**Status:** planned  
-**Depends on:** **L1–L6 harness-green** (hard gate); L8 recommended  
+**Status:** deferred (after v1)  
+**Depends on:** **v1 exit** (V1.5); historically required L1–L6 harness-green  
 **Exit:** Cursor runs smoke via `lacerta_run_scenario`  
 
+**Deferred:** MCP/Remote paused in favor of the [v1 track](../architecture-v1.md). Do not start until V1.5 exit. Not abandoned.
 **Sources:** architecture §9.1, §9.3–§9.4; surfaces §13; port kit §12 L9.
 
 ---

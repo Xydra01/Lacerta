@@ -2,9 +2,12 @@
 
 Lacerta is a local-first AI agent framework: a stateful **manager** that plans, dispatches, and grades; ephemeral **workers** that execute one typed job with a tiny tool set or a Python recipe. Surfaces (chat, code, learn, research, writing) pick templates and allowlists.
 
-## Blueprint
+**Version:** **v0 complete** (L0–L8). **v1 in progress** — deepen the GUI and surface capabilities. MCP/Remote (former L9–L12) are **deferred** until after v1.
 
-- [Architecture (Supervisor–Worker)](lacerta-supervisor-worker-viability.md)
+## Docs
+
+- [Architecture v1](docs/architecture-v1.md) — active product architecture
+- [Architecture (Supervisor–Worker blueprint)](lacerta-supervisor-worker-viability.md)
 - [Port kit (CodeWorker, IPC, harness)](lacerta-port-kit.md)
 - [Surfaces & recipes](lacerta-surfaces-and-recipes.md)
 - [Implementation phases](docs/phases/README.md)
@@ -31,11 +34,13 @@ ollama create lacerta -f Modelfile
 
 That yields `lacerta:latest`, the default `OLLAMA_MODEL`.
 
-## Verify (L0–L6)
+## Verify (v0 bar — keep green)
 
 ```bash
 pytest
 python -m lacerta.harness.gate --help
+# Thin GUI (same manager; stdlib HTTP):
+python -m lacerta.gui
 # Code smoke (needs Ollama):
 export OLLAMA_MODEL=lacerta:latest
 ./scripts/gate.sh smoke_write_file --runs 3
@@ -49,3 +54,10 @@ export LACERTA_HABIT_MODE=deterministic
 # Short writing draft (deterministic by default):
 ./scripts/gate.sh writing_short --runs 1
 ```
+
+Templates remain the default path. Optional LLM manager decompose is off unless
+`LACERTA_LLM_DECOMPOSE=1` (keep narrow for local models; see `.env.example`).
+
+## What’s next (v1)
+
+See [docs/architecture-v1.md](docs/architecture-v1.md) and phases **V1.1–V1.5**: GUI attachments / deliverables / history, code habit in UI, learn tutor & assessment, research/writing depth, multi-turn chat — then declare v1 exit. **Do not start L9–L12 until V1.5.**

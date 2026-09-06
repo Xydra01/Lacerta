@@ -1,9 +1,10 @@
 # Phase L10 — MCP client (`mcp__*` allowlisted)
 
-**Status:** planned  
+**Status:** deferred (after v1)  
 **Depends on:** L9 exit; CodeWorker tools exist; L1–L6 still green  
 **Exit:** One external server callable from a research job  
 
+**Deferred:** See [architecture-v1.md](../architecture-v1.md). Resume after v1; not abandoned.
 **Sources:** architecture §9.1 Client, §9.3; surfaces §13; port kit §12 L10, env `LACERTA_MCP_ALLOWED_SURFACES`.
 
 ---

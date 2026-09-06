@@ -1,9 +1,10 @@
 # Phase L12 — Remote MCP SSE mount + generation lock polish
 
-**Status:** planned  
+**Status:** deferred (after v1)  
 **Depends on:** L9 MCP host + L11 Remote companion  
 **Exit:** Same host tools over mesh + token  
 
+**Deferred:** See [architecture-v1.md](../architecture-v1.md). Resume after v1; not abandoned.
 **Sources:** architecture §9.1 transports, §9.2 MCP mount, §9.4 L12; surfaces §13; port kit §12 L12.
 
 ---

@@ -9,6 +9,11 @@ from typing import Any, Callable, Literal
 
 from lacerta.core.allowlists import is_allowed
 from lacerta.core.jobs import JobResult, JobSpec, Surface
+from lacerta.core.llm_manager import (
+    llm_decompose_enabled,
+    llm_decompose_max,
+    propose_job,
+)
 from lacerta.core.routers import select_template
 from lacerta.core import worker_runtime
 from lacerta.harness.evaluate import check_acceptance
@@ -68,11 +73,15 @@ def spawn_worker(
         from lacerta.workers.writing.worker import run as writing_run
 
         return writing_run(job, client=client, surface=surface)
+    if job.job_type == "chat_answer":
+        from lacerta.core.chat_local import run_chat_answer
+
+        return run_chat_answer(job, client=client)
     return JobResult(
         job_id=job.job_id,
         ok=False,
         summary="",
-        error=f"worker not implemented for {job.job_type!r} (L7+)",
+        error=f"worker not implemented for {job.job_type!r} (L9+)",
     )
 
 
@@ -93,7 +102,65 @@ def _summarize_result(result: JobResult) -> dict[str, Any]:
         "summary": result.summary,
         "error": result.error,
         "metrics": dict(result.metrics or {}),
+        "artifacts": list(result.artifacts or []),
     }
+
+
+def _finish_or_grade(state: MacroState, *, empty_msg: str) -> None:
+    """Plan exhausted — grade disk acceptance if configured."""
+    root = state.inputs.get("root")
+    acceptance = state.inputs.get("acceptance") or {}
+    if root and acceptance:
+        scenario = {
+            "acceptance": acceptance,
+            "instance_id": state.inputs.get("instance_id"),
+            "course_id": state.inputs.get("course_id"),
+            "task_id": state.inputs.get("task_id"),
+            "deliverable_path": state.inputs.get("deliverable_path"),
+        }
+        failures = check_acceptance(scenario, Path(str(root)))
+        if failures:
+            fail_task(state, "; ".join(failures))
+        else:
+            finish_task(state)
+    elif state.results and all(r.get("ok") for r in state.results):
+        finish_task(state)
+    elif state.results:
+        fail_task(state, "plan exhausted with failed jobs")
+    else:
+        fail_task(state, empty_msg)
+
+
+def _run_job(
+    state: MacroState,
+    job: JobSpec,
+    *,
+    client: Any | None,
+    runner: WorkerRunner | None,
+    fail_fast: bool,
+) -> bool:
+    """Validate + spawn. Returns False if manager should stop."""
+    try:
+        validate_job(job, state.surface)
+    except ValueError as e:
+        fail_task(state, str(e))
+        return False
+
+    result = spawn_worker(
+        job,
+        surface=str(state.surface),
+        client=client,
+        runner=runner,
+    )
+    state.results.append(_summarize_result(result))
+
+    if result.error:
+        fail_task(state, result.error)
+        return False
+    if fail_fast and not result.ok and not (state.inputs.get("acceptance")):
+        fail_task(state, result.summary or "worker returned ok=False")
+        return False
+    return True
 
 
 def run_manager(
@@ -112,9 +179,30 @@ def run_manager(
     )
     router = select_template(state)
     if router is None:
-        fail_task(state, "no template matched (LLM decompose disabled until L7)")
-        return state
+        if not llm_decompose_enabled():
+            fail_task(
+                state,
+                "no template matched (set LACERTA_LLM_DECOMPOSE=1 to enable LLM decompose)",
+            )
+            return state
+        if client is None:
+            fail_task(state, "LLM decompose requires Ollama client")
+            return state
+        return _run_llm_loop(state, client=client, runner=runner, fail_fast=fail_fast)
 
+    return _run_template_loop(
+        state, router, client=client, runner=runner, fail_fast=fail_fast
+    )
+
+
+def _run_template_loop(
+    state: MacroState,
+    router: Any,
+    *,
+    client: Any | None,
+    runner: WorkerRunner | None,
+    fail_fast: bool,
+) -> MacroState:
     limit = _manager_max_steps()
     while state.status == "running" and state.steps < limit:
         state.steps += 1
@@ -128,52 +216,66 @@ def run_manager(
             break
 
         if job is None:
-            # Plan exhausted — grade disk acceptance if configured.
-            root = state.inputs.get("root")
-            acceptance = state.inputs.get("acceptance") or {}
-            if root and acceptance:
-                scenario = {
-                    "acceptance": acceptance,
-                    "instance_id": state.inputs.get("instance_id"),
-                    "course_id": state.inputs.get("course_id"),
-                    "task_id": state.inputs.get("task_id"),
-                    "deliverable_path": state.inputs.get("deliverable_path"),
-                }
-                failures = check_acceptance(scenario, Path(str(root)))
-                if failures:
-                    fail_task(state, "; ".join(failures))
-                else:
-                    finish_task(state)
-            elif state.results and all(r.get("ok") for r in state.results):
-                finish_task(state)
-            elif state.results:
-                fail_task(state, "template plan exhausted with failed jobs")
-            else:
-                fail_task(state, "no template job")
+            _finish_or_grade(state, empty_msg="no template job")
             break
 
+        if not _run_job(state, job, client=client, runner=runner, fail_fast=fail_fast):
+            break
+
+    if state.status == "running":
+        fail_task(state, f"manager step limit reached ({limit})")
+    return state
+
+
+def _run_llm_loop(
+    state: MacroState,
+    *,
+    client: Any,
+    runner: WorkerRunner | None,
+    fail_fast: bool,
+) -> MacroState:
+    limit = _manager_max_steps()
+    propose_cap = llm_decompose_max()
+    llm_proposes = 0
+
+    while state.status == "running" and state.steps < limit:
+        state.steps += 1
+        if llm_proposes >= propose_cap:
+            fail_task(
+                state,
+                f"LLM decompose propose cap reached ({propose_cap})",
+            )
+            break
         try:
-            validate_job(job, state.surface)
+            job = propose_job(state, client)
         except ValueError as e:
             fail_task(state, str(e))
             break
 
-        result = spawn_worker(
-            job,
-            surface=str(state.surface),
-            client=client,
-            runner=runner,
-        )
-        state.results.append(_summarize_result(result))
+        if job is None:
+            _finish_or_grade(state, empty_msg="LLM decompose returned done with no jobs")
+            break
 
-        # Hard fail only on explicit worker errors. Soft ok=False still allows
-        # plan exhaustion + disk acceptance (honest harness).
-        if result.error:
-            fail_task(state, result.error)
+        llm_proposes += 1
+        state.plan.append(f"llm:{job.job_type}")
+        if not _run_job(state, job, client=client, runner=runner, fail_fast=fail_fast):
             break
-        if fail_fast and not result.ok and not (state.inputs.get("acceptance")):
-            fail_task(state, result.summary or "worker returned ok=False")
-            break
+
+        # After a successful job, if acceptance is already met, stop early.
+        root = state.inputs.get("root")
+        acceptance = state.inputs.get("acceptance") or {}
+        if root and acceptance:
+            scenario = {
+                "acceptance": acceptance,
+                "instance_id": state.inputs.get("instance_id"),
+                "course_id": state.inputs.get("course_id"),
+                "task_id": state.inputs.get("task_id"),
+                "deliverable_path": state.inputs.get("deliverable_path"),
+            }
+            failures = check_acceptance(scenario, Path(str(root)))
+            if not failures:
+                finish_task(state)
+                break
 
     if state.status == "running":
         fail_task(state, f"manager step limit reached ({limit})")

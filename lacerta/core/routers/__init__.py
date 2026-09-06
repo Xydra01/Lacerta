@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Protocol
 
+from lacerta.core.routers.chat import CHAT_TEMPLATES, ChatPlainTemplate
 from lacerta.core.routers.code import CODE_TEMPLATES, CodeHabitTemplate, CodeSmokeTemplate
 from lacerta.core.routers.learn import LEARN_TEMPLATES, LearnSyllabusFilesTemplate
 from lacerta.core.routers.research import RESEARCH_TEMPLATES, ResearchOfflineTemplate
@@ -27,6 +28,7 @@ TEMPLATES: dict[str, TemplateRouter] = {
     **LEARN_TEMPLATES,
     **RESEARCH_TEMPLATES,
     **WRITING_TEMPLATES,
+    **CHAT_TEMPLATES,
 }
 
 
@@ -50,10 +52,12 @@ def list_template_ids() -> list[str]:
 
 
 __all__ = [
+    "CHAT_TEMPLATES",
     "CODE_TEMPLATES",
     "LEARN_TEMPLATES",
     "RESEARCH_TEMPLATES",
     "WRITING_TEMPLATES",
+    "ChatPlainTemplate",
     "CodeHabitTemplate",
     "CodeSmokeTemplate",
     "LearnSyllabusFilesTemplate",

@@ -1,9 +1,10 @@
 # Phase L11 — Remote companion (pair + PWA + surface launch)
 
-**Status:** planned  
+**Status:** deferred (after v1)  
 **Depends on:** L9 (host concepts) + core L1–L6 green; L10 optional  
 **Exit:** Phone/PWA completes a learn or research job  
 
+**Deferred:** See [architecture-v1.md](../architecture-v1.md). Resume after v1; not abandoned.
 **Sources:** architecture §9.2–§9.4; surfaces §13; port kit §12 L11, `LACERTA_REMOTE_PORT`.
 
 ---

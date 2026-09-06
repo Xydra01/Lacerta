@@ -5,7 +5,7 @@
 
 This document is the **truth** for product surfaces: what each one does, which jobs it may spawn, and which recipes/capabilities implement them.
 
-**Ship order:** code → **learn** → research → writing → chat polish.
+**Ship order:** code → **learn** → research → writing → chat polish → **v1 GUI/capability depth** → (deferred) MCP → Remote.
 
 ---
 

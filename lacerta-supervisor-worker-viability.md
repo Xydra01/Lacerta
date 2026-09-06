@@ -4,9 +4,8 @@
 **Date:** 2026-09-06  
 **Companion docs:**
 - [lacerta-port-kit.md](lacerta-port-kit.md) — CodeWorker, IPC, schema, harness  
-- [lacerta-surfaces-and-recipes.md](lacerta-surfaces-and-recipes.md) — surfaces, recipes (incl. **learn**)
-
-These three docs are the complete Lacerta blueprint.
+- [lacerta-surfaces-and-recipes.md](lacerta-surfaces-and-recipes.md) — surfaces, recipes (incl. **learn**)  
+- [docs/architecture-v1.md](docs/architecture-v1.md) — **v1 product track** (GUI/capabilities; MCP deferred)
 
 ---
 
@@ -19,7 +18,7 @@ These three docs are the complete Lacerta blueprint.
 | Why Supervisor–Worker? | Local mid-size models fail as full OS kernels; they succeed as specialists with tiny contexts |
 | Multi-surface product? | **Yes** — chat, code, learn, research, writing |
 | Multi-engine runtime? | **No** — one manager; workers differ by JobType |
-| Ship order | code → **learn** → research → writing → chat/GUI polish → **MCP** → **Remote** |
+| Ship order | **v0 done** (→ thin GUI). **v1 next** (GUI + surface depth). **MCP → Remote deferred** after v1 — see [docs/architecture-v1.md](docs/architecture-v1.md) |
 
 ---
 
@@ -267,14 +266,15 @@ lacerta/
 6. ResearchWorker → WritingWorker  
 7. LLM manager decompose behind flag  
 8. Thin GUI (surface tabs + job activity)  
-9. **MCP host + client** (integrations)  
-10. **Remote companion** (phone/PWA over private mesh)
+9. **v1 track** — GUI product shell + surface depth (see [docs/architecture-v1.md](docs/architecture-v1.md), phases V1.1–V1.5)  
+10. **MCP host + client** (integrations) — **deferred until after v1**  
+11. **Remote companion** (phone/PWA over private mesh) — **deferred until after v1**
 
 ---
 
 ## 9. Integrations (deferred — do not abandon)
 
-MCP and Remote are **first-class Lacerta advantages**, but they ship **last**—after code, learn, research, writing, and a thin GUI are harness-green. They wrap the same manager; they must not invent a second brain.
+MCP and Remote are **first-class Lacerta advantages**, but they ship **after v1 product depth**—not immediately after the thin GUI. They wrap the same manager; they must not invent a second brain. Active plan: [docs/architecture-v1.md](docs/architecture-v1.md).
 
 ### 9.1 MCP (two directions)
 

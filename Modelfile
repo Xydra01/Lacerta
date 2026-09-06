@@ -1,0 +1,13 @@
+# Lacerta worker/manager base model — Ollama tag: lacerta:latest
+# Build: ollama create lacerta -f Modelfile
+FROM qwen3.5:9b
+
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
+
+# Prefer concise structured tool JSON over long chain-of-thought novels.
+SYSTEM """You are Lacerta, a local coding and task agent.
+Follow JSON / schema instructions exactly when given.
+Prefer one clear tool action at a time. Keep reasoning short.
+Do not invent capability IDs or multi-agent chat. Paths are relative to PROJECT_ROOT.
+"""

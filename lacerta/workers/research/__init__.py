@@ -1,1 +1,1 @@
-"""Research surface recipes and capabilities (L5)."""
+"""Research surface recipes and capabilities."""

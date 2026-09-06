@@ -19,7 +19,7 @@ Numbered phase docs for building Lacerta from the blueprint trio:
 | [L2](phase-L2.md) | Manager + surface allowlists + code templates | Manager spawns CodeWorker |
 | [L3](phase-L3.md) | LearnWorker + syllabus recipes + structure gate | `learn_syllabus_files` green |
 | [L4](phase-L4.md) | Honest evaluate + habit acceptance | `habit_tracker` tracked |
-| [L5](phase-L5.md) | ResearchWorker | `research_local` green |
+| [L5](phase-L5.md) | ResearchWorker | `research_local` green (done) |
 | [L6](phase-L6.md) | WritingWorker | `writing_short` green |
 | [L7](phase-L7.md) | Optional LLM manager decompose (flagged) | Templates still default |
 | [L8](phase-L8.md) | Thin GUI (surface tabs + job log) | No second OS |

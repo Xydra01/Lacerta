@@ -1,6 +1,6 @@
 # Phase L2 — Manager + surface allowlists + code templates
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** L1 exit (`smoke_write_file` 3/3)  
 **Exit:** Manager spawns CodeWorker (template path)  
 
@@ -16,24 +16,24 @@ Introduce the single stateful Manager that only `spawn_worker` / `finish_task` /
 
 ## Checkboxes
 
-- [ ] Implement `lacerta/core/manager.py` deterministic loop (architecture §3.3)
-  - [ ] `MacroState(surface, goal, plan=[], results=[])`
-  - [ ] Cap steps with `LACERTA_MANAGER_MAX_STEPS` (default 20)
-  - [ ] Apply `JobResult` summaries only (not full transcripts)
-- [ ] Manager tools **only:** `spawn_worker(JobSpec)`, `finish_task`, `fail_task`
-- [ ] Surface → JobType allowlists (surfaces §3)
-  - [ ] chat: `chat_answer`, `research_light`
-  - [ ] code: `code_recon`, `code_edit`, `code_test`
-  - [ ] learn / research / writing enums registered; reject cross-surface jobs
-- [ ] Python routers under `lacerta/core/routers/`
-  - [ ] `tpl.code.smoke` → one `code_edit` JobSpec
-  - [ ] Optional stub templates for other surfaces (no-op or NotImplemented until their phase)
-- [ ] `validate(job)`: Pydantic + surface allowlist before spawn
-- [ ] Wire `worker_runtime.run(job)` for `code_*` JobTypes; dispatch stub for others
-- [ ] Fast path: one worker for whole smoke goal (avoid unnecessary multi-job)
-- [ ] Scenario/path: gate smoke goes **through manager** (not calling worker directly)
-- [ ] Unit test: manager rejects e.g. `research_local` while `surface=code`
-- [ ] Unit test: manager finishes when acceptance met / fails cleanly on hard worker failure
+- [x] Implement `lacerta/core/manager.py` deterministic loop (architecture §3.3)
+  - [x] `MacroState(surface, goal, plan=[], results=[])`
+  - [x] Cap steps with `LACERTA_MANAGER_MAX_STEPS` (default 20)
+  - [x] Apply `JobResult` summaries only (not full transcripts)
+- [x] Manager tools **only:** `spawn_worker(JobSpec)`, `finish_task`, `fail_task`
+- [x] Surface → JobType allowlists (surfaces §3)
+  - [x] chat: `chat_answer`, `research_light`
+  - [x] code: `code_recon`, `code_edit`, `code_test`
+  - [x] learn / research / writing enums registered; reject cross-surface jobs
+- [x] Python routers under `lacerta/core/routers/`
+  - [x] `tpl.code.smoke` → one `code_edit` JobSpec
+  - [x] Optional stub templates for other surfaces (no-op or NotImplemented until their phase)
+- [x] `validate(job)`: Pydantic + surface allowlist before spawn
+- [x] Wire `worker_runtime.run(job)` for `code_*` JobTypes; dispatch stub for others
+- [x] Fast path: one worker for whole smoke goal (avoid unnecessary multi-job)
+- [x] Scenario/path: gate smoke goes **through manager** (not calling worker directly)
+- [x] Unit test: manager rejects e.g. `research_local` while `surface=code`
+- [x] Unit test: manager finishes when acceptance met / fails cleanly on hard worker failure
 
 ---
 
@@ -66,18 +66,20 @@ pytest tests/test_manager_allowlist.py tests/test_manager_smoke.py -q
 ./scripts/gate.sh smoke_write_file --runs 3
 ```
 
-**Pass criteria:** Smoke still 3/3; job log / metrics show manager spawn of CodeWorker. Scenario `manager_grades_failure` (optional this phase): worker fails → manager `fail_task` cleanly.
+**Pass criteria:** Smoke still 3/3; job log / metrics show manager spawn of CodeWorker. Scenario `manager_grades_failure` (optional this phase): worker fails; manager stops cleanly.
+
+**Verified:** 3/3 via manager with `OLLAMA_MODEL=lacerta:latest` (logs show `manager status=finished steps=2 jobs=[smoke-…]`).
 
 ---
 
 ## Architecture PR checklist
 
-- [ ] One manager for all surfaces (no per-surface OS)
-- [ ] Manager cannot call FS / shell / web tools
-- [ ] Templates before free LLM decompose (LLM path off or stubbed)
-- [ ] Surfaces = UX + templates + allowlists only
-- [ ] Workers remain ephemeral
-- [ ] No MCP/Remote
+- [x] One manager for all surfaces (no per-surface OS)
+- [x] Manager cannot call FS / shell / web tools
+- [x] Templates before free LLM decompose (LLM path off or stubbed)
+- [x] Surfaces = UX + templates + allowlists only
+- [x] Workers remain ephemeral
+- [x] No MCP/Remote
 
 ---
 

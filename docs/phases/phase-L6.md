@@ -1,6 +1,6 @@
 # Phase L6 — WritingWorker
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** L5 exit (`research_local` green)  
 **Exit:** `writing_short` green  
 
@@ -16,18 +16,18 @@ Ship Writing as a recipe-runner surface with WritingBrief, draft buffer → comp
 
 ## Checkboxes
 
-- [ ] `WritingBrief` model (surfaces §8.1) — scope, tone, length_mode, `advance_when`
-- [ ] Artifacts: `tasks/<id>/writing/active_draft.json` + deliverable `.md`
-- [ ] Capabilities: ingest / init / draft_sections / read_outline / compile / finalize
-- [ ] Recipes: `writing.dynamic`, `writing.from_sources`
-- [ ] JobTypes: `write_draft`, `write_finalize`, `write_from_sources`
-- [ ] Compile rules: one `# Title`; sections as `## …`; strip duplicate `#` from bodies
-- [ ] `advance_when` enforced in **Python** (manager template or worker), not prompt milestones
-- [ ] Manager template `tpl.writing.short` → draft → finalize (or single recipe path)
-- [ ] Prefer multi-job section drafts for long docs (document pattern; short path for harness)
-- [ ] Surface allowlist for writing JobTypes
-- [ ] Harness `writing_short`: ≥ 300 chars; `#` title present
-- [ ] Chat stub: manager-local `chat_answer` optional; no CodeWorker FS for chat
+- [x] `WritingBrief` model (surfaces §8.1) — scope, tone, length_mode, `advance_when`
+- [x] Artifacts: `tasks/<id>/writing/active_draft.json` + deliverable `.md`
+- [x] Capabilities: ingest / init / draft_sections / read_outline / compile / finalize
+- [x] Recipes: `writing.dynamic`, `writing.from_sources`
+- [x] JobTypes: `write_draft`, `write_finalize`, `write_from_sources`
+- [x] Compile rules: one `# Title`; sections as `## …`; strip duplicate `#` from bodies
+- [x] `advance_when` enforced in **Python** (manager template or worker), not prompt milestones
+- [x] Manager template `tpl.writing.short` → draft → finalize (or single recipe path)
+- [x] Prefer multi-job section drafts for long docs (document pattern; short path for harness)
+- [x] Surface allowlist for writing JobTypes
+- [x] Harness `writing_short`: ≥ 300 chars; `#` title present
+- [ ] Chat stub: manager-local `chat_answer` optional; no CodeWorker FS for chat — deferred (not required for exit)
 
 ---
 
@@ -64,21 +64,21 @@ pytest tests/test_writing_compile.py tests/test_writing_advance.py -q
 
 **Pass criteria:** Deliverable ≥ 300 characters with a clear `#` title. L1–L5 scenarios still green.
 
-**Phase gate:** After L6, core surfaces (code + learn + research + writing) are harness-honest → L7/L8 may proceed; **L9+ still blocked until L1–L6 remain green.**
+**Phase gate:** Core surfaces L1–L6 are harness-honest. L7+ is separate; **no cascade CreatePlan for L7**. L9+ still blocked until L1–L6 remain green.
 
 ---
 
 ## Architecture PR checklist
 
-- [ ] Writing = recipes; one manager
-- [ ] Limits / advance rules in Python
-- [ ] No dual orchestrator
-- [ ] Harness scenario present
-- [ ] Do not start MCP/Remote until this phase (and L1–L5) stay green
-- [ ] Code still tool-loop; writing not using CodeWorker FS as primary path
+- [x] Writing = recipes; one manager
+- [x] Limits / advance rules in Python
+- [x] No dual orchestrator
+- [x] Harness scenario present
+- [x] Do not start MCP/Remote until this phase (and L1–L5) stay green
+- [x] Code still tool-loop; writing not using CodeWorker FS as primary path
 
 ---
 
 ## Out of scope
 
-LLM decompose (L7), GUI (L8), MCP, Remote.
+LLM decompose (L7), GUI (L8), MCP, Remote. Chat stub deferred.

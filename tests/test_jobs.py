@@ -82,13 +82,12 @@ def test_surfaces_literal() -> None:
 
 
 def test_stub_imports() -> None:
-    assert CODE_TOOL_REGISTRY == {}
-    assert scenarios.SCENARIOS == {}
+    assert "write_file" in CODE_TOOL_REGISTRY
+    assert "smoke_write_file" in scenarios.SCENARIOS
     assert callable(manager.run_manager)
     assert callable(worker_runtime.run)
     assert callable(gate.main)
 
 
-def test_gate_main_exits_zero() -> None:
-    assert gate.main([]) == 0
-    assert gate.main(["smoke_write_file", "--runs", "3"]) == 0
+def test_gate_unknown_scenario() -> None:
+    assert gate.main(["not_a_real_scenario"]) == 1

@@ -7,6 +7,7 @@ dist/
 build/
 .env
 logs/
+harness/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

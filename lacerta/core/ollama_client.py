@@ -18,6 +18,29 @@ def _model() -> str:
     return os.getenv("OLLAMA_MODEL", "lacerta:latest").strip() or "lacerta:latest"
 
 
+def default_num_ctx() -> int:
+    """Context window for chat options. Mac 8GB profile defaults to 8k."""
+    raw = os.getenv("OLLAMA_NUM_CTX", "").strip()
+    if raw:
+        try:
+            return max(1024, min(131072, int(raw)))
+        except ValueError:
+            pass
+    # devMacOS / 8GB Apple Silicon: keep KV cache modest by default.
+    return 8192
+
+
+def default_num_predict() -> int | None:
+    raw = os.getenv("OLLAMA_NUM_PREDICT", "").strip()
+    if not raw:
+        # Cap generations so small models finish turns instead of rambling.
+        return 1024
+    try:
+        return max(64, min(8192, int(raw)))
+    except ValueError:
+        return 1024
+
+
 @dataclass
 class ModelCheckResult:
     ok: bool
@@ -27,8 +50,24 @@ class ModelCheckResult:
     unknown: bool = True
 
 
-CAPABLE_MODELS = frozenset({"lacerta", "lacerta:latest"})
-DEGRADED_MODELS = frozenset()
+# Harness-verified / intended Lacerta tags (including Mac 4B rebuild of lacerta:latest).
+CAPABLE_MODELS = frozenset(
+    {
+        "lacerta",
+        "lacerta:latest",
+        "lacerta:macos",
+        "qwen3.5:4b",
+        "qwen3.5:4b-mlx",
+    }
+)
+DEGRADED_MODELS = frozenset(
+    {
+        "qwen3.5:2b",
+        "qwen3.5:0.8b",
+        "llama3.2:3b",
+        "llama3.2:1b",
+    }
+)
 
 
 def check_worker_model(*, surface: str = "cli", strict: bool = False) -> ModelCheckResult:
@@ -69,12 +108,22 @@ class OllamaClient:
         format: dict[str, Any] | str | None = None,
         stream: bool = False,
         force_think_disabled: bool = True,
+        num_ctx: int | None = None,
+        num_predict: int | None = None,
     ) -> dict[str, Any]:
+        options: dict[str, Any] = {"temperature": temperature}
+        ctx = default_num_ctx() if num_ctx is None else num_ctx
+        if ctx is not None:
+            options["num_ctx"] = int(ctx)
+        pred = default_num_predict() if num_predict is None else num_predict
+        if pred is not None:
+            options["num_predict"] = int(pred)
+
         payload: dict[str, Any] = {
             "model": self.model,
             "messages": messages,
             "stream": bool(stream),
-            "options": {"temperature": temperature},
+            "options": options,
         }
         if force_think_disabled:
             payload["think"] = False

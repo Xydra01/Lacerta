@@ -88,7 +88,8 @@ class CodeHabitTemplate:
                 tools = ["run_command", "read_file", "list_dir", "grep"]
                 objective = (
                     "Run pytest for the habit tracker using run_command "
-                    "with `python -m pytest -q`. Then set final_report."
+                    "with `python3 -m pytest -q` (or `python -m pytest -q`). "
+                    "Then set final_report."
                 )
                 inputs = {"root": str(root)}
                 if deterministic:

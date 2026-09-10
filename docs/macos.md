@@ -4,6 +4,8 @@
 **Hardware target:** 2023 MacBook Air M2, 8GB unified memory  
 **Model target:** Qwen3.5 **4B** via Ollama (`lacerta:latest`)
 
+**Full install & first-run walkthrough:** [getting-started.md](getting-started.md)
+
 This profile keeps the same Supervisor–Worker contracts, flat tool JSON schema, and harness gates as mainline Lacerta. The changes are sizing and Mac ergonomics so the stack stays usable without swapping.
 
 ---
@@ -24,43 +26,20 @@ A 9B model plus a large KV cache will contend with macOS and Chrome on 8GB unifi
 
 ---
 
-## One-time setup
+## Setup & run
+
+Use **[getting-started.md](getting-started.md)** for the full path (CLT, Homebrew, Ollama, venv, model, GUI, gates).
+
+Short form:
 
 ```bash
-# 1. Python 3.11+ (Homebrew recommended)
-brew install python@3.12
-brew install --cask ollama   # or download from https://ollama.com
-
-# 2. Clone / checkout this branch
 git checkout devMacOS
-
-# 3. Project env
-python3 -m venv .venv
-source .venv/bin/activate
+python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
 cp .env.example .env
-
-# 4. Model
 ./scripts/setup-macos.sh
-# or manually:
-#   ollama pull qwen3.5:4b
-#   ollama create lacerta -f Modelfile
+python3 -m lacerta.gui   # http://127.0.0.1:8765/
 ```
-
-Confirm: `ollama list` shows `lacerta:latest` and `qwen3.5:4b`.
-
----
-
-## Run
-
-```bash
-source .venv/bin/activate
-pytest -q
-python3 -m lacerta.gui          # http://127.0.0.1:8765/
-./scripts/gate.sh smoke_write_file --runs 3   # needs Ollama + lacerta:latest
-```
-
-Deterministic surfaces (learn / writing / habit default) work without a hot model.
 
 ---
 

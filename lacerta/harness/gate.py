@@ -151,6 +151,9 @@ def run_scenario(name: str, *, runs: int = 1, client: OllamaClient | None = None
 
 
 def main(argv: list[str] | None = None) -> int:
+    from lacerta.core.envload import load_dotenv
+
+    load_dotenv()
     parser = argparse.ArgumentParser(
         prog="lacerta.harness.gate",
         description="Lacerta harness gate.",

@@ -19,6 +19,7 @@ Formally close v0 planning for “GUI stub → MCP → Remote” and open the **
 - [x] Publish [docs/architecture-v1.md](../architecture-v1.md)
 - [x] Mark L9–L12 **deferred** (not abandoned)
 - [x] Add V1.1–V1.5 phase docs
+- [x] *(amend)* V1.35 shared corpus + architecture §4.3 (post-charter planning add)
 - [x] Update [docs/phases/README.md](README.md) ship order
 - [x] Update root README links (architecture + v1 verify note)
 

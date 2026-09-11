@@ -5,7 +5,7 @@
 
 This document is the **truth** for product surfaces: what each one does, which jobs it may spawn, and which recipes/capabilities implement them.
 
-**Ship order:** code → **learn** → research → writing → chat polish → **v1 GUI/capability depth** → (deferred) MCP → Remote.
+**Ship order:** code → **learn** → research → writing → chat polish → **v1 GUI/capability depth** (incl. **shared corpus V1.35**) → (deferred) MCP → Remote.
 
 ---
 
@@ -72,7 +72,8 @@ JobType = Literal[
     "learn_syllabus_web",     # gather topic → ingest → write → finalize
     "learn_assessment",       # generate assessment for a node (optional build step)
     "learn_tutor_turn",       # one Socratic tutor reply (or manager-local)
-    "learn_archive_chat",     # RAG chat over an archive
+    "learn_archive_chat",     # RAG chat over an archive / course corpus
+    "learn_index_corpus",     # multi-pass extract→chunk→map→embed (v1.35)
     # research
     "research_local", "research_web", "research_light",
     # writing
@@ -86,7 +87,7 @@ JobType = Literal[
 |---------|------------------|
 | chat | `chat_answer`, `research_light` |
 | code | `code_recon`, `code_edit`, `code_test` |
-| learn | `learn_syllabus_*`, `learn_assessment`, `learn_tutor_turn`, `learn_archive_chat` |
+| learn | `learn_syllabus_*`, `learn_assessment`, `learn_tutor_turn`, `learn_archive_chat`, `learn_index_corpus` |
 | research | `research_local`, `research_web` |
 | writing | `write_draft`, `write_finalize`, `write_from_sources` |
 
@@ -153,16 +154,25 @@ Learn is a **first-class surface**, second in ship order after code.
 ```
 instances/{instance_id}/learn/
   courses/{course_id}/
-    course.json
+    course.json            # may include corpus_id
     syllabus.json          # canonical ledger
     sources/
+    corpus/                # course-bound corpus (v1.35) — see §6.10
+      corpus.json
+      sources/
+      chunks/
+      map.md | toc.json
+      index/
     assessments/{id}.json
     tutor_history.json
   archives/{archive_id}/
     archive.json
     sources/
+    corpus/                # same shared corpus shape
     outputs/               # quiz_*.md, study_guide_*.md
     chat_history.json
+  corpora/{corpus_id}/     # optional shared root if not nested under course/archive
+    …
 ```
 
 Ephemeral build marker (optional): `tasks/syllabus_build_{course_id}.json` while a build job runs.
@@ -278,21 +288,24 @@ JobSpec(
 
 **Write-syllabus LLM step:** The worker may use an internal LLM call to *propose* syllabus JSON from notes, then pass it through `learn.write_syllabus` validation. Validation lives in **Python**, not in the prompt.
 
-### 6.7 Tutor & archives (v0)
+### 6.7 Tutor, archives & corpus (v1)
 
 | JobType | Behavior |
 |---------|----------|
-| `learn_tutor_turn` | Socratic tutor over active course; temp ~0.7; persist `tutor_history.json`. May be manager-local with course context injected. |
-| `learn_archive_chat` | Retrieve top-k chunks from archive index → grounded reply; persist chat history. |
+| `learn_tutor_turn` | Socratic tutor over active course; temp ~0.7; persist `tutor_history.json`. Inject syllabus node + **retrieved** corpus chunks when a corpus is bound. |
+| `learn_archive_chat` | Retrieve top-k chunks from archive/course corpus → grounded reply; persist chat history. |
+| `learn_index_corpus` | Multi-pass index recipe (extract → chunk → map → embed); writes `corpus.json` complete. |
 
-**Archives**
+**Archives / course corpora**
 
-- Index sources into a local vector collection (`learn_archive_{instance}_{id}`)  
-- Auto-index on upload / when stale  
+- Index user-supplied sources into a local collection (`learn_archive_{instance}_{id}` or course `corpus/`)
+- Auto-index on upload / when source fingerprints go stale
 - Generate quiz / study guide markdown under `outputs/` (GUI or small recipe later)
 
 **Do:** Prefer offline embeddings; no surprise downloads.  
-**Don't:** Give tutor/archive chat the CodeWorker FS toolkit.
+**Do:** Manager passes `corpus_id` only — never chunk bodies.  
+**Don't:** Give tutor/archive chat the CodeWorker FS toolkit.  
+**Don't:** Concatenate entire textbooks into manager or single-worker context.
 
 ### 6.8 Harness scenarios (learn)
 
@@ -300,8 +313,9 @@ JobSpec(
 |----------|------------|
 | `learn_syllabus_files` | `syllabus.json` exists; ≥8 nodes; ≥5 with `parent_id`; `course.json` `build_complete` / syllabus `active` |
 | `learn_syllabus_shallow_reject` | Intentionally shallow JSON → `write_syllabus` fails; job `ok=False` (unit/harness) |
+| `learn_corpus_retrieve` | Fixture mini-book indexed; retrieve returns planted fact; grounded job cites chunk/page |
 
-Honest evaluate: **disk syllabus structure**, not “finalize observed in logs.”
+Honest evaluate: **disk syllabus structure** / **corpus.json + retrieve**, not “finalize observed in logs.”
 
 ### 6.9 Learn do / don't
 
@@ -311,6 +325,28 @@ Honest evaluate: **disk syllabus structure**, not “finalize observed in logs.�
 | One write of syllabus per build | Rewrite loops after success |
 | Recipe runner for build | Separate learn LoopEngine |
 | Tutor/archive as narrow jobs or manager-local | Tutor that can edit the whole repo |
+| Shared corpus retrieve for large files | Full-book prompts; dual LearnRAG engine |
+
+### 6.10 Shared corpus (cross-surface contract)
+
+Used by **learn** (textbooks) and **research** (bulk uploads). One subsystem — see architecture-v1 §4.3 and phase V1.35.
+
+```text
+Upload sources → corpus.index_sources (ephemeral, multi-pass)
+  → corpus.json + chunks + map + index on disk
+Later jobs → corpus.retrieve(query, top_k) → tiny worker context
+Manager → plans + corpus_id only
+```
+
+| Capability | Role |
+|------------|------|
+| `corpus.extract` | PDF/text → page/section units (Python) |
+| `corpus.chunk` | Stable chunk ids + metadata |
+| `corpus.map` | TOC / chapter summaries over small windows |
+| `corpus.embed` | Offline vectors; else keyword backend |
+| `corpus.retrieve` | Top-k + max_chars caps in Python |
+
+**Reality checks:** college textbook → learn tutor; research dump → sectioned report without manager memorizing the pile.
 
 ---
 
@@ -319,6 +355,8 @@ Honest evaluate: **disk syllabus structure**, not “finalize observed in logs.�
 ### 7.1 Goal
 
 Produce a non-empty markdown **research deliverable** from scratchpad notes + optional web SourceRegistry bibliography.
+
+**Large uploads:** when attachment size/count exceeds a Python threshold, use the **shared corpus** (§6.10): index once, retrieve per outline/section. Do not full-concat into `ingest_offline`. Small fixtures may keep classic offline ingest.
 
 ### 7.2 Artifacts
 

@@ -19,12 +19,17 @@ def run(job: JobSpec, *, client: Any | None = None, surface: str = "learn") -> J
         recipe_id = str(inputs.get("recipe_id") or "learn.syllabus_from_files")
     elif job.job_type == "learn_syllabus_web":
         recipe_id = str(inputs.get("recipe_id") or "learn.syllabus_from_web")
-    elif job.job_type in ("learn_tutor_turn", "learn_archive_chat", "learn_assessment"):
+    elif job.job_type in (
+        "learn_tutor_turn",
+        "learn_archive_chat",
+        "learn_assessment",
+        "learn_index_corpus",
+    ):
         return JobResult(
             job_id=job.job_id,
             ok=False,
             summary="",
-            error=f"{job.job_type} not implemented in L3",
+            error=f"{job.job_type} not implemented yet (see V1.3 / V1.35)",
         )
 
     data_root = str(inputs.get("data_root") or inputs.get("root") or ".")

@@ -202,7 +202,7 @@ The thin AgentLoop lives **inside workers**, not as the whole product. The manag
 | `workers/research/` | Notes/web/report recipes |
 | `workers/writing/` | Draft/finalize recipes |
 | `harness/` | Scenarios, evaluate, gate |
-| `storage/` | Paths, embeddings, learn registry |
+| `storage/` | Paths, **shared corpus** (chunk/index/retrieve), embeddings, learn registry |
 | `gui/` | Thin later — surface tabs + job log |
 | `integrations/mcp_host.py` | Late: Cursor meta-tools → manager |
 | `integrations/mcp_client.py` | Late: external `mcp__*` into allowlisted jobs |
@@ -266,7 +266,7 @@ lacerta/
 6. ResearchWorker → WritingWorker  
 7. LLM manager decompose behind flag  
 8. Thin GUI (surface tabs + job activity)  
-9. **v1 track** — GUI product shell + surface depth (see [docs/architecture-v1.md](docs/architecture-v1.md), phases V1.1–V1.5)  
+9. **v1 track** — GUI product shell + surface depth + **shared corpus multi-pass index** (see [docs/architecture-v1.md](docs/architecture-v1.md), phases V1.1–V1.5 / V1.35)  
 10. **MCP host + client** (integrations) — **deferred until after v1**  
 11. **Remote companion** (phone/PWA over private mesh) — **deferred until after v1**
 

@@ -15,6 +15,7 @@ JobType = Literal[
     "learn_assessment",
     "learn_tutor_turn",
     "learn_archive_chat",
+    "learn_index_corpus",
     "research_local",
     "research_web",
     "research_light",

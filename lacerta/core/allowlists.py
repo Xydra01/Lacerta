@@ -16,6 +16,7 @@ SURFACE_JOB_TYPES: dict[Surface, frozenset[str]] = {
             "learn_assessment",
             "learn_tutor_turn",
             "learn_archive_chat",
+            "learn_index_corpus",
         }
     ),
     "research": frozenset({"research_local", "research_web"}),

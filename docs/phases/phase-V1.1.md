@@ -57,4 +57,4 @@ LACERTA_LLM_DECOMPOSE=0 ./scripts/gate.sh writing_short --runs 1
 
 ## Out of scope
 
-Habit mode UI (V1.2), learn tutor (V1.3), web gather (V1.4), multi-turn chat (V1.5).
+Habit mode UI (V1.2), learn tutor (V1.3), corpus index (V1.35), web gather (V1.4), multi-turn chat (V1.5).

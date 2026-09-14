@@ -1,6 +1,6 @@
 # Phase V1.1 — GUI product shell
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** V1.0  
 **Exit:** GUI supports attachments, deliverable viewing, and recent-run history without becoming a second orchestrator  
 
@@ -16,13 +16,13 @@ Turn the L8 stub into a usable local shell: surface-appropriate inputs, visible 
 
 ## Checkboxes
 
-- [ ] Research (and writing-from-sources prep): **attachment picker / path list** in UI; POST `/api/run` passes `attachments`
-- [ ] **Deliverable viewer**: list artifact paths; `GET` bounded file preview (size-capped text)
-- [ ] **Run history**: last N runs in-process (status, surface, goal snippet, artifacts)—no durable DB required
-- [ ] Surface-specific form hints (placeholders already present; add learn course ids, writing title if cheap)
-- [ ] Keep generation lock; reject concurrent runs with 409
-- [ ] Headless tests for `/api/surfaces`, `/api/run` wiring (mock runner/client where needed)
-- [ ] Update `lacerta/gui/README.md` manual smoke
+- [x] Research (and writing-from-sources prep): **attachment picker / path list** in UI; POST `/api/run` passes `attachments`
+- [x] **Deliverable viewer**: list artifact paths; `GET` bounded file preview (size-capped text)
+- [x] **Run history**: last N runs in-process (status, surface, goal snippet, artifacts)—no durable DB required
+- [x] Surface-specific form hints (placeholders already present; add learn course ids, writing title if cheap)
+- [x] Keep generation lock; reject concurrent runs with 409
+- [x] Headless tests for `/api/surfaces`, `/api/run` wiring (mock runner/client where needed)
+- [x] Update `lacerta/gui/README.md` manual smoke
 
 ---
 
@@ -48,10 +48,10 @@ LACERTA_LLM_DECOMPOSE=0 ./scripts/gate.sh writing_short --runs 1
 
 ## Architecture PR checklist
 
-- [ ] GUI still only calls manager (no FS tools in UI process beyond reading deliverables for preview)
-- [ ] Preview is bounded (max bytes / text only)
-- [ ] No MCP/Remote
-- [ ] Disk remains SoT
+- [x] GUI still only calls manager (no FS tools in UI process beyond reading deliverables for preview)
+- [x] Preview is bounded (max bytes / text only)
+- [x] No MCP/Remote
+- [x] Disk remains SoT
 
 ---
 

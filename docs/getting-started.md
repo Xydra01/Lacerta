@@ -261,13 +261,15 @@ Open **http://127.0.0.1:8765/** in Safari or Chrome.
 
 2. **Writing / Learn (no hot model required for default recipes)**  
    - Switch tabs and run a short goal.  
-   - Check **Artifacts** for paths on disk.
+   - Writing: optional draft title field. Learn: course id + attachment paths.  
+   - Check **Artifacts** for paths on disk; click a path to **Preview** (text, size-capped).
 
 3. **Chat**  
    - Needs Ollama + `lacerta:latest`. Ask a short question; confirm a reply in the log.
 
 4. **Research**  
-   - Offline recipe uses attachments / local sources; follow the placeholder text in the tab.
+   - Paste absolute attachment paths (one per line), e.g. `/Users/you/Documents/notes.md`.  
+   - After Run, confirm artifacts, preview, and an entry under **Recent runs**.
 
 There is **no free “job type” picker** — only surface tabs. That is intentional (surfaces choose templates and allowlists).
 

@@ -56,9 +56,40 @@ def test_parse_tool_turn_final_report() -> None:
 
 def test_parse_tool_turn_invalid() -> None:
     assert parse_tool_turn("not json", frozenset({"write_file"})) is None
-    assert parse_tool_turn('{"tools":[]}', frozenset({"write_file"})) is None
+    assert parse_tool_turn("{}", frozenset({"write_file"})) is not None  # empty turn tolerated
     bad = (
         '{"reasoning":"x","tools":[{"name":"run_command","arguments":{}}],'
         '"final_report":""}'
     )
     assert parse_tool_turn(bad, frozenset({"write_file"})) is None
+
+
+def test_parse_tool_turn_wrapped_json() -> None:
+    raw = (
+        "Sure.\n"
+        '{"reasoning":"write","tools":[{"name":"write_file",'
+        '"arguments":{"path":"a.py","content":"x"}}],"final_report":""}\n'
+        "done"
+    )
+    parsed = parse_tool_turn(raw, frozenset({"write_file"}))
+    assert parsed is not None
+    assert parsed["tools"][0]["name"] == "write_file"
+
+
+def test_parse_tool_turn_missing_reasoning_defaults() -> None:
+    raw = '{"tools":[{"name":"write_file","arguments":{"path":"a.py","content":"x"}}],"final_report":""}'
+    parsed = parse_tool_turn(raw, frozenset({"write_file"}))
+    assert parsed is not None
+    assert parsed["reasoning"] == ""
+
+
+def test_parse_tool_turn_alt_arg_keys() -> None:
+    raw = (
+        '{"reasoning":"w","tools":[{"name":"write_file",'
+        '"arguments":{"file":"a.py","text":"hi"}}],"final_report":""}'
+    )
+    parsed = parse_tool_turn(raw, frozenset({"write_file"}))
+    assert parsed is not None
+    args = parsed["tools"][0]["arguments"]
+    assert args["path"] == "a.py"
+    assert args["content"] == "hi"

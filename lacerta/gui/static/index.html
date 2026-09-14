@@ -27,6 +27,18 @@
         <span>Workspace root</span>
         <input id="root" type="text" autocomplete="off" />
       </label>
+      <label class="field" id="courseWrap" hidden>
+        <span>Course id</span>
+        <input id="courseId" type="text" value="gui-course" autocomplete="off" />
+      </label>
+      <label class="field" id="titleWrap" hidden>
+        <span>Draft title</span>
+        <input id="draftTitle" type="text" placeholder="Optional # title for the draft" autocomplete="off" />
+      </label>
+      <label class="field" id="attachWrap" hidden>
+        <span>Attachments (one absolute path per line)</span>
+        <textarea id="attachments" rows="3" placeholder="/Users/you/Documents/notes.md"></textarea>
+      </label>
       <label class="check" id="lightWrap" hidden>
         <input type="checkbox" id="light" />
         <span>Light research before answer</span>
@@ -36,11 +48,18 @@
 
     <section class="status" id="status" aria-live="polite"></section>
 
+    <section class="history">
+      <h2>Recent runs</h2>
+      <div id="history" class="history-body"></div>
+    </section>
+
     <section class="log">
       <h2>Job log</h2>
       <div id="log" class="log-body"></div>
       <h2>Artifacts</h2>
       <ul id="artifacts" class="arts"></ul>
+      <h2>Preview</h2>
+      <pre id="preview" class="preview" aria-live="polite">Select an artifact to preview (text, size-capped).</pre>
     </section>
   </div>
   <script src="/app.js"></script>

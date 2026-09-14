@@ -4,54 +4,52 @@ Lacerta is a local-first AI agent framework: a stateful **manager** that plans, 
 
 **Version:** **v0 complete** (L0–L8). **v1 in progress** — deepen the GUI and surface capabilities. MCP/Remote (former L9–L12) are **deferred** until after v1.
 
+**This branch (`devMacOS`):** Apple Silicon profile for a **2023 MacBook Air M2 / 8GB** — Ollama base **`qwen3.5:4b`**, 8k context.
+
+## Start here
+
+**[Getting started (full Mac setup)](docs/getting-started.md)** — install tools, clone, model, GUI, first runs, troubleshooting.
+
 ## Docs
 
+- [Getting started](docs/getting-started.md) — **full start-to-finish setup**
+- [macOS / M2 8GB profile](docs/macos.md) — memory/model rationale
 - [Architecture v1](docs/architecture-v1.md) — active product architecture
 - [Architecture (Supervisor–Worker blueprint)](lacerta-supervisor-worker-viability.md)
 - [Port kit (CodeWorker, IPC, harness)](lacerta-port-kit.md)
 - [Surfaces & recipes](lacerta-surfaces-and-recipes.md)
 - [Implementation phases](docs/phases/README.md)
 
-## Setup
+## Quick setup (macOS)
 
 ```bash
-python -m venv .venv
-# Windows Git Bash / WSL:
-source .venv/Scripts/activate   # or: source .venv/bin/activate
+git checkout devMacOS
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e ".[dev]"
+cp .env.example .env
+./scripts/setup-macos.sh   # pulls qwen3.5:4b and builds lacerta:latest
+python3 -m lacerta.gui     # http://127.0.0.1:8765/
 ```
 
-Copy [`.env.example`](.env.example) to `.env` when you need local overrides.
+Requires [Ollama](https://ollama.com) (App or `brew install --cask ollama`). Details, gates, and troubleshooting: [docs/getting-started.md](docs/getting-started.md).
 
-### Ollama model (`lacerta:latest`)
+### Larger hosts (not this branch’s default)
 
-Requires a local [`qwen3.5:9b`](https://ollama.com) base, then:
-
-```bash
-ollama pull qwen3.5:9b   # if needed
-ollama create lacerta -f Modelfile
-```
-
-That yields `lacerta:latest`, the default `OLLAMA_MODEL`.
+Mainline historically used `qwen3.5:9b` + 32k context. Do **not** use that Modelfile on 8GB Macs.
 
 ## Verify (v0 bar — keep green)
 
 ```bash
 pytest
-python -m lacerta.harness.gate --help
-# Thin GUI (same manager; stdlib HTTP):
-python -m lacerta.gui
+./scripts/gate.sh --help
+python3 -m lacerta.gui
 # Code smoke (needs Ollama):
-export OLLAMA_MODEL=lacerta:latest
 ./scripts/gate.sh smoke_write_file --runs 3
-# Learn syllabus (deterministic by default):
+# Deterministic surfaces:
 ./scripts/gate.sh learn_syllabus_files --runs 1
-# Habit tracker code-reliability bar (deterministic default):
-export LACERTA_HABIT_MODE=deterministic
 ./scripts/gate.sh habit_tracker --runs 3
-# Offline research:
 ./scripts/gate.sh research_local --runs 1
-# Short writing draft (deterministic by default):
 ./scripts/gate.sh writing_short --runs 1
 ```
 
@@ -61,3 +59,5 @@ Templates remain the default path. Optional LLM manager decompose is off unless
 ## What’s next (v1)
 
 See [docs/architecture-v1.md](docs/architecture-v1.md) and phases **V1.1–V1.5** (incl. **V1.35 shared corpus**): GUI attachments / deliverables / history, code habit in UI, learn tutor & assessment, textbook/research multi-pass index + retrieve, research/writing depth, multi-turn chat — then declare v1 exit. **Do not start L9–L12 until V1.5.**
+
+On `devMacOS`, when syncing from `main`, re-validate the Mac memory/model profile before merging feature work.

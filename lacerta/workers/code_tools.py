@@ -287,6 +287,7 @@ def run_command(command: str) -> str:
     """Allowlisted shell: pytest / python -m pytest only, cwd=project root."""
     import shlex
     import subprocess
+    from pathlib import Path
 
     block = _require_project_root()
     if isinstance(block, str):
@@ -302,17 +303,16 @@ def run_command(command: str) -> str:
     if not parts:
         return "❌ OS BLOCK: empty command"
 
-    allowed_prefixes = (
-        ["pytest"],
-        ["python", "-m", "pytest"],
-        ["python3", "-m", "pytest"],
-        ["py", "-m", "pytest"],
-    )
+    def _is_python_bin(token: str) -> bool:
+        base = Path(token).name.lower()
+        # python, python3, python3.12, py — absolute venv paths OK on macOS
+        return base == "py" or base == "python" or base.startswith("python3")
+
     ok = False
-    for prefix in allowed_prefixes:
-        if parts[: len(prefix)] == prefix:
-            ok = True
-            break
+    if parts[0] == "pytest":
+        ok = True
+    elif len(parts) >= 3 and _is_python_bin(parts[0]) and parts[1] == "-m" and parts[2] == "pytest":
+        ok = True
     if not ok:
         return (
             "❌ OS BLOCK: command not allowlisted. "

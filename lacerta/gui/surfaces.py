@@ -14,6 +14,9 @@ SURFACE_DEFAULTS: dict[str, dict[str, Any]] = {
         "job_types": ("chat_answer",),
         "label": "Chat",
         "placeholder": "Ask a question…",
+        "show_attachments": False,
+        "show_course_id": False,
+        "show_title": False,
     },
     "code": {
         "template_id": "tpl.code.smoke",
@@ -21,24 +24,36 @@ SURFACE_DEFAULTS: dict[str, dict[str, Any]] = {
         "label": "Code",
         "placeholder": "Create harness_smoke.py that prints HARNESS_OK",
         "tools": ["read_file", "write_file", "list_dir", "grep"],
+        "show_attachments": False,
+        "show_course_id": False,
+        "show_title": False,
     },
     "learn": {
         "template_id": "tpl.learn.syllabus_files",
         "job_types": ("learn_syllabus_files",),
         "label": "Learn",
         "placeholder": "Build a short syllabus from local notes",
+        "show_attachments": True,
+        "show_course_id": True,
+        "show_title": False,
     },
     "research": {
         "template_id": "tpl.research.offline",
         "job_types": ("research_local",),
         "label": "Research",
         "placeholder": "Offline research note from attached sources",
+        "show_attachments": True,
+        "show_course_id": False,
+        "show_title": False,
     },
     "writing": {
         "template_id": "tpl.writing.short",
         "job_types": ("write_draft",),
         "label": "Writing",
         "placeholder": "Two-paragraph markdown draft with a clear # title.",
+        "show_attachments": False,
+        "show_course_id": False,
+        "show_title": True,
     },
 }
 
@@ -54,6 +69,9 @@ def list_surfaces() -> list[dict[str, Any]]:
                 "job_types": list(meta["job_types"]),
                 "allowed_job_types": sorted(allowed_job_types(sid)),
                 "placeholder": meta.get("placeholder") or "",
+                "show_attachments": bool(meta.get("show_attachments")),
+                "show_course_id": bool(meta.get("show_course_id")),
+                "show_title": bool(meta.get("show_title")),
             }
         )
     return out
@@ -66,6 +84,8 @@ def build_run_inputs(
     *,
     light_research: bool = False,
     attachments: list[str] | None = None,
+    course_id: str | None = None,
+    title: str | None = None,
 ) -> dict[str, Any]:
     """Build manager inputs for a GUI run. Never invents disallowed job types."""
     if surface not in SURFACE_DEFAULTS:
@@ -97,13 +117,18 @@ def build_run_inputs(
         }
     if surface == "learn":
         inputs["instance_id"] = "gui"
-        inputs["course_id"] = "gui-course"
+        cid = (course_id or "").strip() or "gui-course"
+        inputs["course_id"] = cid
+        inputs["attachments"] = list(attachments or [])
     if surface == "research":
         inputs["attachments"] = list(attachments or [])
         inputs["deliverable_path"] = f"tasks/{task_id}/research/report.md"
     if surface == "writing":
         inputs["target_document"] = "short.md"
         inputs["deliverable_path"] = f"tasks/{task_id}/writing/short.md"
+        t = (title or "").strip()
+        if t:
+            inputs["title"] = t[:120]
         inputs["acceptance"] = {
             "min_deliverable_chars": 300,
             "require_title": True,

@@ -44,6 +44,7 @@ def test_each_surface_map() -> None:
             "learn_assessment",
             "learn_tutor_turn",
             "learn_archive_chat",
+            "learn_index_corpus",
         },
         "research": {"research_local", "research_web"},
         "writing": {"write_draft", "write_finalize", "write_from_sources"},

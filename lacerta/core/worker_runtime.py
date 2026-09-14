@@ -20,7 +20,7 @@ from lacerta.workers.code_tools import (
 )
 
 WORKER_SYSTEM_PROMPT = """You are Lacerta CodeWorker.
-Each turn reply with JSON only:
+Each turn reply with ONE JSON object only (no markdown, no extra text):
 {"reasoning":"...","tools":[{"name":"TOOL","arguments":{...}}],"final_report":""}
 Exactly one tools[] entry per turn (name + arguments object), OR tools=[] with a non-empty final_report when done.
 Example write:
@@ -293,9 +293,13 @@ def run(job: JobSpec, *, client: Any | None = None, surface: str = "code") -> Jo
             metrics=row,
         )
     if scaffold == "habit_test":
+        import sys
+
         set_project_root(root)
         try:
-            out = CODE_TOOL_REGISTRY["run_command"]["func"]("python -m pytest -q")
+            # Prefer the active interpreter (python3 on macOS Homebrew/venv).
+            cmd = f"{sys.executable} -m pytest -q"
+            out = CODE_TOOL_REGISTRY["run_command"]["func"](cmd)
         finally:
             set_project_root(None)
         ok = out.startswith("[OK]")

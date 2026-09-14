@@ -137,26 +137,76 @@ def build_worker_json_schema(tool_names: frozenset[str]) -> dict[str, Any]:
     )
 
 
+def _strip_markdown_fence(text: str) -> str:
+    text = text.strip()
+    if not text.startswith("```"):
+        return text
+    lines = text.splitlines()
+    if lines and lines[0].startswith("```"):
+        lines = lines[1:]
+    if lines and lines[-1].strip() == "```":
+        lines = lines[:-1]
+    return "\n".join(lines).strip()
+
+
+def _extract_json_object(text: str) -> str | None:
+    """Return the first balanced {...} substring, or None.
+
+    Small local models sometimes wrap valid JSON in a short preface/epilogue.
+    Prefer the first object that looks like a Lacerta tool turn.
+    """
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_str = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_str:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_str = False
+            continue
+        if ch == '"':
+            in_str = True
+        elif ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+    return None
+
+
+def _loads_tool_json(text: str) -> dict[str, Any] | None:
+    candidates: list[str] = [text]
+    extracted = _extract_json_object(text)
+    if extracted and extracted not in candidates:
+        candidates.append(extracted)
+    for cand in candidates:
+        try:
+            parsed = json.loads(cand)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    return None
+
+
 def parse_tool_turn(raw: str, tools_allowed: frozenset[str]) -> dict[str, Any] | None:
-    text = (raw or "").strip()
+    text = _strip_markdown_fence(raw or "")
     if not text:
         return None
-    # Tolerate optional markdown fences
-    if text.startswith("```"):
-        lines = text.splitlines()
-        if lines and lines[0].startswith("```"):
-            lines = lines[1:]
-        if lines and lines[-1].strip() == "```":
-            lines = lines[:-1]
-        text = "\n".join(lines).strip()
-    try:
-        parsed = json.loads(text)
-    except json.JSONDecodeError:
-        return None
-    if not isinstance(parsed, dict):
+    parsed = _loads_tool_json(text)
+    if parsed is None:
         return None
     if "reasoning" not in parsed:
-        return None
+        # Tolerate missing reasoning from weaker models; keep schema cohesion.
+        parsed["reasoning"] = ""
     tools = parsed.get("tools")
     if tools is None:
         parsed["tools"] = []
@@ -184,4 +234,9 @@ def parse_tool_turn(raw: str, tools_allowed: frozenset[str]) -> dict[str, Any] |
             call["arguments"] = {}
         elif not isinstance(args, dict):
             return None
+        # Tolerate alternate key names some 3–4B models invent.
+        if "path" not in call["arguments"] and "file" in call["arguments"]:
+            call["arguments"]["path"] = call["arguments"].pop("file")
+        if "content" not in call["arguments"] and "text" in call["arguments"]:
+            call["arguments"]["content"] = call["arguments"].pop("text")
     return parsed

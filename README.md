@@ -60,4 +60,4 @@ Templates remain the default path. Optional LLM manager decompose is off unless
 
 ## What’s next (v1)
 
-See [docs/architecture-v1.md](docs/architecture-v1.md) and phases **V1.1–V1.5**: GUI attachments / deliverables / history, code habit in UI, learn tutor & assessment, research/writing depth, multi-turn chat — then declare v1 exit. **Do not start L9–L12 until V1.5.**
+See [docs/architecture-v1.md](docs/architecture-v1.md) and phases **V1.1–V1.5** (incl. **V1.35 shared corpus**): GUI attachments / deliverables / history, code habit in UI, learn tutor & assessment, textbook/research multi-pass index + retrieve, research/writing depth, multi-turn chat — then declare v1 exit. **Do not start L9–L12 until V1.5.**

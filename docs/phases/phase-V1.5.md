@@ -1,10 +1,10 @@
 # Phase V1.5 — Chat continuity & v1 exit
 
 **Status:** planned  
-**Depends on:** V1.1–V1.4 (or V1.1 + parallel depth as available); L8 chat path  
-**Exit:** Multi-turn chat in GUI; v1 regression matrix green; v1 declared done; MCP/Remote still deferred  
+**Depends on:** V1.1–V1.4 including **V1.35** (or V1.1 + parallel depth as available); L8 chat path  
+**Exit:** Multi-turn chat in GUI; v1 regression matrix green (incl. corpus retrieve gate); v1 declared done; MCP/Remote still deferred  
 
-**Sources:** architecture-v1 §4.1–§4.2, §6; surfaces §9.
+**Sources:** architecture-v1 §4.1–§4.3, §6; surfaces §9.
 
 ---
 
@@ -22,7 +22,9 @@ Finish the local product loop: chat that remembers the session in the GUI, live-
 - [ ] v1 regression matrix documented in README / architecture-v1:
   - [ ] pytest green
   - [ ] writing_short, research_local, learn_syllabus_files, habit_tracker (det), smoke (Ollama)
-  - [ ] GUI manual smoke checklist updated
+  - [ ] learn_corpus_retrieve (or successor) green — fixture book → index → cite
+  - [ ] GUI manual smoke checklist updated (incl. learn attach → index if exposed)
+- [ ] Optional: chat may pass `corpus_id` for light grounded answers (not required for exit if learn/research cover it)
 - [ ] Mark architecture-v1 **v1 exit met** when matrix passes
 - [ ] Confirm L9–L12 remain deferred (no scope creep)
 
@@ -47,6 +49,7 @@ LACERTA_HABIT_MODE=deterministic ./scripts/gate.sh habit_tracker --runs 1
 ./scripts/gate.sh writing_short --runs 1
 ./scripts/gate.sh research_local --runs 1
 ./scripts/gate.sh learn_syllabus_files --runs 1
+./scripts/gate.sh learn_corpus_retrieve --runs 1   # once V1.35 landed
 # smoke if Ollama up
 ```
 

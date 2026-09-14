@@ -12,7 +12,7 @@ Numbered phase docs for building Lacerta from the blueprint trio, plus the **v1 
 **Ship order (current):**
 
 1. **v0 complete:** code → learn → research → writing → chat/thin GUI (L0–L8)  
-2. **v1 active:** deepen GUI + surface capabilities (V1.0–V1.5)  
+2. **v1 active:** deepen GUI + surface capabilities (V1.0–V1.5), including **shared corpus index (V1.35)**  
 3. **Deferred:** MCP → Remote (L9–L12) — resume only after **V1.5**
 
 **Hard gate:** do not start **L9+** until **v1 exit (V1.5)** and **L1–L6** remain harness-honest.
@@ -42,9 +42,10 @@ Numbered phase docs for building Lacerta from the blueprint trio, plus the **v1 
 | [V1.0](phase-V1.0.md) | Charter + architecture | Docs landed; L9–L12 deferred |
 | [V1.1](phase-V1.1.md) | GUI product shell | Attachments, deliverable viewer, run history |
 | [V1.2](phase-V1.2.md) | Code depth in GUI | Smoke **or** habit selectable; acceptance visible |
-| [V1.3](phase-V1.3.md) | Learn depth | Tutor/assessment/archive + course UI |
-| [V1.4](phase-V1.4.md) | Research & writing depth | from_sources + bounded gather + GUI |
-| [V1.5](phase-V1.5.md) | Chat continuity & v1 exit | Multi-turn chat + full regression bar |
+| [V1.3](phase-V1.3.md) | Learn depth | Tutor/assessment/archive stub + course UI; corpus paths reserved |
+| [V1.35](phase-V1.35.md) | Shared corpus & multi-pass index | Extract→chunk→map→embed→retrieve; learn textbook harness |
+| [V1.4](phase-V1.4.md) | Research & writing depth | from_sources + bounded gather; research bulk via corpus |
+| [V1.5](phase-V1.5.md) | Chat continuity & v1 exit | Multi-turn chat + regression bar (incl. corpus gate) |
 
 ---
 
@@ -78,3 +79,5 @@ Numbered phase docs for building Lacerta from the blueprint trio, plus the **v1 
 - [ ] Learn deferred without cause?
 - [ ] MCP/Remote inventing a parallel brain?
 - [ ] MCP/Remote blocking core / v1 surface ship order?
+- [ ] Manager holding corpus chunk text?
+- [ ] Separate per-surface RAG engines instead of shared corpus?

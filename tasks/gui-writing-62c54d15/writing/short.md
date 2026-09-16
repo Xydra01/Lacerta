@@ -1,9 +1,0 @@
-# Lacerta Writing Draft
-
-## Introduction
-
-This short draft introduces Write a two paragraph markdown about the topic of this document.. Local-first agents keep inference and tools on the user's machine so acceptance can be judged against disk artifacts rather than log theater. Privacy and latency both improve when the filesystem remains the source of truth for edits.
-
-## Approach
-
-Lacerta's writing surface uses a Python recipe runner: draft sections into a buffer, compile a single markdown title with section headings, then finalize a deliverable. Advance rules such as single_draft are enforced in code before the file is written, matching the Supervisor–Worker design.

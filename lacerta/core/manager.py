@@ -39,6 +39,8 @@ class MacroState:
     status: Literal["running", "finished", "failed"] = "running"
     error: str | None = None
     steps: int = 0
+    acceptance_ok: bool | None = None
+    acceptance_failures: list[str] = field(default_factory=list)
 
 
 def validate_job(job: JobSpec, surface: Surface | str) -> None:
@@ -120,14 +122,23 @@ def _finish_or_grade(state: MacroState, *, empty_msg: str) -> None:
         }
         failures = check_acceptance(scenario, Path(str(root)))
         if failures:
+            state.acceptance_ok = False
+            state.acceptance_failures = list(failures)
             fail_task(state, "; ".join(failures))
         else:
+            state.acceptance_ok = True
+            state.acceptance_failures = []
             finish_task(state)
     elif state.results and all(r.get("ok") for r in state.results):
+        state.acceptance_ok = None
         finish_task(state)
     elif state.results:
+        state.acceptance_ok = False
+        state.acceptance_failures = ["plan exhausted with failed jobs"]
         fail_task(state, "plan exhausted with failed jobs")
     else:
+        state.acceptance_ok = False
+        state.acceptance_failures = [empty_msg]
         fail_task(state, empty_msg)
 
 
@@ -171,6 +182,7 @@ def run_manager(
     client: Any | None = None,
     runner: WorkerRunner | None = None,
     fail_fast: bool = True,
+    on_progress: Callable[[MacroState], None] | None = None,
 ) -> MacroState:
     state = MacroState(
         surface=surface,
@@ -188,11 +200,31 @@ def run_manager(
         if client is None:
             fail_task(state, "LLM decompose requires Ollama client")
             return state
-        return _run_llm_loop(state, client=client, runner=runner, fail_fast=fail_fast)
+        return _run_llm_loop(
+            state,
+            client=client,
+            runner=runner,
+            fail_fast=fail_fast,
+            on_progress=on_progress,
+        )
 
     return _run_template_loop(
-        state, router, client=client, runner=runner, fail_fast=fail_fast
+        state,
+        router,
+        client=client,
+        runner=runner,
+        fail_fast=fail_fast,
+        on_progress=on_progress,
     )
+
+
+def _notify(on_progress: Callable[[MacroState], None] | None, state: MacroState) -> None:
+    if on_progress is None:
+        return
+    try:
+        on_progress(state)
+    except Exception:
+        pass
 
 
 def _run_template_loop(
@@ -202,6 +234,7 @@ def _run_template_loop(
     client: Any | None,
     runner: WorkerRunner | None,
     fail_fast: bool,
+    on_progress: Callable[[MacroState], None] | None = None,
 ) -> MacroState:
     limit = _manager_max_steps()
     while state.status == "running" and state.steps < limit:
@@ -219,11 +252,14 @@ def _run_template_loop(
             _finish_or_grade(state, empty_msg="no template job")
             break
 
+        _notify(on_progress, state)
         if not _run_job(state, job, client=client, runner=runner, fail_fast=fail_fast):
             break
+        _notify(on_progress, state)
 
     if state.status == "running":
         fail_task(state, f"manager step limit reached ({limit})")
+    _notify(on_progress, state)
     return state
 
 
@@ -233,6 +269,7 @@ def _run_llm_loop(
     client: Any,
     runner: WorkerRunner | None,
     fail_fast: bool,
+    on_progress: Callable[[MacroState], None] | None = None,
 ) -> MacroState:
     limit = _manager_max_steps()
     propose_cap = llm_decompose_max()
@@ -258,8 +295,10 @@ def _run_llm_loop(
 
         llm_proposes += 1
         state.plan.append(f"llm:{job.job_type}")
+        _notify(on_progress, state)
         if not _run_job(state, job, client=client, runner=runner, fail_fast=fail_fast):
             break
+        _notify(on_progress, state)
 
         # After a successful job, if acceptance is already met, stop early.
         root = state.inputs.get("root")
@@ -274,9 +313,12 @@ def _run_llm_loop(
             }
             failures = check_acceptance(scenario, Path(str(root)))
             if not failures:
+                state.acceptance_ok = True
+                state.acceptance_failures = []
                 finish_task(state)
                 break
 
     if state.status == "running":
         fail_task(state, f"manager step limit reached ({limit})")
+    _notify(on_progress, state)
     return state

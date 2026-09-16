@@ -119,7 +119,7 @@ def args_for(cap_id: str, job: JobSpec, ctx: CapabilityContext) -> dict[str, Any
     elif cap_id.endswith("ingest_offline"):
         if inputs.get("topic") or job.objective:
             base["topic"] = inputs.get("topic") or job.objective
-    elif cap_id.endswith("synthesize_notes"):
+    elif cap_id.endswith("synthesize_notes") or cap_id.endswith("synthesize_from_corpus"):
         if inputs.get("topic") or job.objective:
             base["topic"] = inputs.get("topic") or job.objective
         if "use_llm" in inputs:
@@ -140,9 +140,40 @@ def args_for(cap_id: str, job: JobSpec, ctx: CapabilityContext) -> dict[str, Any
         base["max_searches"] = gather.get("max_searches", 2)
         base["max_pages"] = gather.get("max_pages", 3)
     elif cap_id.endswith("generate_assessments"):
-        for k in ("node_id", "target_tier", "questions_json", "passing_score"):
+        for k in ("node_id", "target_tier", "questions_json", "passing_score", "max_nodes"):
             if k in inputs:
                 base[k] = inputs[k]
+    elif cap_id.endswith("mastery_check"):
+        base["node_id"] = inputs.get("node_id") or ""
+        if "questions_count" in inputs:
+            base["questions_count"] = inputs["questions_count"]
+    elif cap_id.endswith("generate_quiz"):
+        base["node_id"] = (
+            inputs.get("node_id") or ctx.extra.get("node_id") or ""
+        )
+        if "questions_count" in inputs:
+            base["questions_count"] = inputs["questions_count"]
+    elif cap_id.endswith("generate_flashcards") or cap_id.endswith("generate_study_guide"):
+        base["node_id"] = inputs.get("node_id") or ctx.extra.get("node_id") or ""
+    elif cap_id.endswith("tutor_turn"):
+        base["question"] = inputs.get("question") or job.objective
+        if inputs.get("node_id"):
+            base["node_id"] = inputs["node_id"]
+        if inputs.get("history_digest") is not None:
+            base["history_digest"] = inputs["history_digest"]
+        if inputs.get("prior_turns") is not None:
+            base["prior_turns"] = inputs["prior_turns"]
+    elif cap_id.startswith("corpus."):
+        if inputs.get("corpus_root"):
+            base["corpus_root"] = inputs["corpus_root"]
+        if cap_id.endswith("retrieve"):
+            base["query"] = inputs.get("query") or job.objective
+            if "top_k" in inputs:
+                base["top_k"] = inputs["top_k"]
+            if "max_chars" in inputs:
+                base["max_chars"] = inputs["max_chars"]
+    elif cap_id.endswith("archive_chat"):
+        base["message"] = inputs.get("message") or job.objective
     elif cap_id.endswith("light_web_context"):
         base["user_input"] = str(inputs.get("user_input") or job.objective)
     elif cap_id.endswith("append_note"):
@@ -215,7 +246,15 @@ def run_recipe(
             metrics["context"] = str(ctx_val)
         if path := result.data.get("path"):
             artifacts.append(str(path))
-        for key in ("syllabus_path", "course_path", "notes_path", "report_path"):
+        for key in (
+            "syllabus_path",
+            "course_path",
+            "notes_path",
+            "report_path",
+            "tutor_path",
+            "assessments_path",
+            "history_path",
+        ):
             if p := result.data.get(key):
                 artifacts.append(str(p))
     return JobResult(

@@ -1,6 +1,6 @@
 # Phase V1.35 — Shared corpus & multi-pass index
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** V1.3 (course paths / learn JobTypes); V1.1 attachments UX helpful but not required for headless  
 **Exit:** Shared corpus layout + multi-pass index recipe + retrieve capability; learn textbook fixture harness green; manager never holds chunk bodies  
 
@@ -18,33 +18,33 @@ Make material larger than the model context first-class: ingest → multi-pass d
 
 ### Layout & contracts
 
-- [ ] `storage/corpus` (or equivalent): paths for `corpus.json`, `sources/`, `chunks/`, `map`/`toc`, `index/`
-- [ ] `corpus.json` fields: `corpus_id`, `status`, source fingerprints, chunk_count, index_backend (`none` | `keyword` | `embeddings`), stale flag
-- [ ] Course binding: learn course may reference `corpus_id` (under course tree or shared corpora root)
-- [ ] JobTypes / templates: e.g. `learn_index_corpus` (or recipe under existing learn allowlist); archive chat uses retrieve
+- [x] `storage/corpus` (or equivalent): paths for `corpus.json`, `sources/`, `chunks/`, `map`/`toc`, `index/`
+- [x] `corpus.json` fields: `corpus_id`, `status`, source fingerprints, chunk_count, index_backend (`none` | `keyword` | `embeddings`), stale flag
+- [x] Course binding: learn course may reference `corpus_id` (under course tree or shared corpora root)
+- [x] JobTypes / templates: e.g. `learn_index_corpus` (or recipe under existing learn allowlist); archive chat uses retrieve
 
 ### Multi-pass capabilities (worker-side only)
 
-- [ ] `corpus.extract` — PDF/text → page/section units (Python; no LLM required)
-- [ ] `corpus.chunk` — structure-aware or fixed chunks + stable ids + page/heading metadata
-- [ ] `corpus.map` — multi-pass TOC / coarse chapter summaries (small windows; optional LLM)
-- [ ] `corpus.embed` — offline embeddings preferred; honest skip → keyword backend
-- [ ] `corpus.retrieve` — query → top-k chunks; caps in Python (`top_k`, `max_chars`)
-- [ ] Recipe `corpus.index_sources`: extract → chunk → map → embed → mark complete
-- [ ] Freshness: re-index when source hash changes
+- [x] `corpus.extract` — PDF/text → page/section units (Python; no LLM required) — text/md only; PDF honest skip
+- [x] `corpus.chunk` — structure-aware or fixed chunks + stable ids + page/heading metadata
+- [x] `corpus.map` — multi-pass TOC / coarse chapter summaries (deterministic default)
+- [x] `corpus.embed` — offline embeddings preferred; honest skip → keyword backend (Mac default)
+- [x] `corpus.retrieve` — query → top-k chunks; caps in Python (`top_k`, `max_chars`)
+- [x] Recipe `corpus.index_sources`: extract → chunk → map → embed → mark complete
+- [x] Freshness: re-index when source hash changes (`stale` via fingerprints)
 
 ### Learn reality check
 
-- [ ] GUI or CLI path: attach textbook/notes → run index job → `corpus.json` complete
-- [ ] `learn_tutor_turn` and/or `learn_archive_chat` inject **retrieved** chunks only (not full book)
-- [ ] Optional: syllabus propose may use map + sampled chunks instead of full ingest concat
-- [ ] Citations in grounded replies (chunk id / page / source)
+- [x] GUI or CLI path: attach textbook/notes → run index job → `corpus.json` complete (**Index sources**)
+- [x] `learn_tutor_turn` and/or `learn_archive_chat` inject **retrieved** chunks only (not full book)
+- [ ] Optional: syllabus propose may use map + sampled chunks instead of full ingest concat (deferred)
+- [x] Citations in grounded replies (chunk id / page / source)
 
 ### Honesty
 
-- [ ] Harness: fixture mini-book with a planted fact → index → retrieve returns that fact → job `ok`
-- [ ] Manager checklist: no chunk text in manager prompts; only `corpus_id` + plan
-- [ ] No second RAG orchestrator; no CodeWorker FS toolkit on corpus jobs
+- [x] Harness: fixture mini-book with a planted fact → index → retrieve returns that fact → job `ok`
+- [x] Manager checklist: no chunk text in manager prompts; only `corpus_id` + plan
+- [x] No second RAG orchestrator; no CodeWorker FS toolkit on corpus jobs
 
 ---
 
@@ -57,7 +57,7 @@ Make material larger than the model context first-class: ingest → multi-pass d
 | `lacerta/workers/learn/*` | Bind course ↔ corpus; tutor/archive retrieve |
 | `lacerta/core/jobs.py` / routers / allowlists | JobTypes + templates as needed |
 | `lacerta/gui/*` | Upload → index affordance on learn (thin) |
-| `lacerta/harness/scenarios.py` | `learn_corpus_retrieve` (name TBD) |
+| `lacerta/harness/scenarios.py` | `learn_corpus_retrieve` |
 | `tests/` | Corpus unit + harness wiring |
 
 ---
@@ -66,20 +66,21 @@ Make material larger than the model context first-class: ingest → multi-pass d
 
 ```bash
 pytest tests/ -q -k corpus
-./scripts/gate.sh learn_corpus_retrieve --runs 1   # once scenario lands
-./scripts/gate.sh learn_syllabus_files --runs 1    # no regression
+./scripts/gate.sh learn_corpus_retrieve --runs 1
+./scripts/gate.sh learn_syllabus_files --runs 1
+pytest tests/test_gui_surface_wiring.py tests/test_gui_api.py -q
 ```
 
 ---
 
 ## Architecture PR checklist
 
-- [ ] One shared corpus subsystem
-- [ ] Manager does not hold chunk bodies / embeddings
-- [ ] Limits in Python
-- [ ] Disk (`corpus.json` + chunks) is SoT
-- [ ] Offline embeddings default / no surprise downloads
-- [ ] User-supplied files only (no paywall scrape)
+- [x] One shared corpus subsystem
+- [x] Manager does not hold chunk bodies / embeddings
+- [x] Limits in Python
+- [x] Disk (`corpus.json` + chunks) is SoT
+- [x] Offline/keyword default / no surprise downloads
+- [x] User-supplied files only (no paywall scrape)
 
 ---
 
@@ -89,3 +90,4 @@ pytest tests/ -q -k corpus
 - Cloud embedding providers as default
 - Cross-course analytics, full quiz generator UI
 - MCP-backed vector DBs
+- PDF parsing dependency (text/md harness is the exit bar)

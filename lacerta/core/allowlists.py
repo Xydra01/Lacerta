@@ -14,6 +14,8 @@ SURFACE_JOB_TYPES: dict[Surface, frozenset[str]] = {
             "learn_syllabus_files",
             "learn_syllabus_web",
             "learn_assessment",
+            "learn_mastery_check",
+            "learn_practice_quiz",
             "learn_tutor_turn",
             "learn_archive_chat",
             "learn_index_corpus",

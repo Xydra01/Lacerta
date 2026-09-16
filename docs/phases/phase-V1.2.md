@@ -1,27 +1,35 @@
-# Phase V1.2 — Code depth in GUI
+# Phase V1.2 — Code checks & scenarios in GUI
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** V1.1  
-**Exit:** GUI can run **smoke** or **habit** code templates; acceptance outcome visible in the job log  
+**Exit:** GUI can run a **named code check / premade scenario** (not a smoke|habit “mode” toggle); acceptance pass/fail is visible in the job log  
 
-**Sources:** architecture-v1 §4.2; `tpl.code.smoke` / `tpl.code.habit`; habit gate.
+**Sources:** architecture-v1 §4.1–§4.2; `tpl.code.smoke` / `tpl.code.habit` (harness ids stay CLI-facing); habit gate.
 
 ---
 
 ## Goal
 
-Expose the real code reliability path (habit) alongside smoke, with honest acceptance feedback in the UI—disk still SoT.
+Give the Code surface an obvious **Test / Run check** path with human-readable scenario labels. Wire those to existing templates under the hood. Disk remains SoT; CLI keeps developer scenario names (`smoke_write_file`, `habit_tracker`).
+
+**Do not** label the UI “smoke” or “habit mode.”
+
+| GUI label | Template / acceptance (internal) |
+|-----------|----------------------------------|
+| Quick file check | `tpl.code.smoke` |
+| Habit tracker (scaffold + tests) | `tpl.code.habit` + `habit_tracker` |
 
 ---
 
 ## Checkboxes
 
-- [ ] Code surface mode selector: `smoke` → `tpl.code.smoke` · `habit` → `tpl.code.habit`
-- [ ] Habit runs use deterministic scaffold path by default (`LACERTA_HABIT_MODE=deterministic` documented)
-- [ ] Job log shows plan steps (recon → edit → test) and final acceptance pass/fail reason
-- [ ] Do **not** make the canvas/editor SoT; optional “open root in explorer” is OS-level only if added
-- [ ] Headless test: `build_run_inputs(..., mode="habit")` sets `tpl.code.habit`
-- [ ] Regression: `./scripts/gate.sh habit_tracker --runs 1` (deterministic)
+- [x] Code surface: **Test / scenario** control with plain labels (not smoke|habit modes)
+- [x] Wire `scenario` (or `check_id`) → `tpl.code.smoke` / `tpl.code.habit` in `build_run_inputs`
+- [x] Habit-tracker scenario uses deterministic scaffold by default (`LACERTA_HABIT_MODE=deterministic` documented for CLI)
+- [x] Job log shows plan steps (when multi-step) and final acceptance pass/fail reason
+- [x] Do **not** make the canvas/editor SoT
+- [x] Headless test: `build_run_inputs(..., scenario="habit_tracker")` sets `tpl.code.habit`
+- [x] Regression: `./scripts/gate.sh habit_tracker --runs 1` (deterministic CLI)
 
 ---
 
@@ -29,16 +37,18 @@ Expose the real code reliability path (habit) alongside smoke, with honest accep
 
 | Path | Action |
 |------|--------|
-| `lacerta/gui/surfaces.py` | Code mode → template_id |
-| `lacerta/gui/static/*` | Mode control |
-| `tests/test_gui_surface_wiring.py` | Habit wiring |
+| `lacerta/gui/surfaces.py` | Scenario → template_id + acceptance |
+| `lacerta/gui/static/*` | Test / scenario control + acceptance row |
+| `lacerta/gui/server.py` | Pass `scenario`; structured acceptance in response |
+| `tests/test_gui_surface_wiring.py` | Scenario wiring |
+| `tests/test_gui_api.py` | API + acceptance fields |
 
 ---
 
 ## Tests
 
 ```bash
-pytest tests/test_gui_surface_wiring.py -q
+pytest tests/test_gui_surface_wiring.py tests/test_gui_api.py -q
 LACERTA_HABIT_MODE=deterministic ./scripts/gate.sh habit_tracker --runs 1
 ```
 
@@ -46,12 +56,13 @@ LACERTA_HABIT_MODE=deterministic ./scripts/gate.sh habit_tracker --runs 1
 
 ## Architecture PR checklist
 
-- [ ] Still one CodeWorker tool loop
-- [ ] Manager has no FS tools
-- [ ] Habit acceptance remains disk/pytest honest
+- [x] Still one CodeWorker tool loop
+- [x] Manager has no FS tools
+- [x] Habit acceptance remains disk/pytest honest
+- [x] GUI copy does not require users to learn harness jargon
 
 ---
 
 ## Out of scope
 
-Full IDE, arbitrary multi-root workspaces, MCP tools in code jobs.
+Full IDE, arbitrary multi-root workspaces, MCP tools in code jobs, renaming CLI gate scenario ids.

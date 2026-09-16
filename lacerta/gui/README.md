@@ -16,19 +16,35 @@ Stack choice: **stdlib only** (no Gradio/Streamlit/FastAPI) so runtime deps stay
 
 ## Manual smoke (macOS)
 
-1. Start Ollama with `lacerta:latest` (needed for **code** / **chat**).
-2. Launch GUI; leave surface on **Code**; goal: create `harness_smoke.py` that prints `HARNESS_OK`.
-3. Confirm job log shows a spawn/finish and the file exists under the workspace root.
-4. Switch to **Research**; paste an absolute attachment path (e.g. `/Users/you/Documents/notes.md`), one per line; Run; confirm artifact paths appear.
-5. Click an artifact → **Preview** shows size-capped UTF-8 text (or a clear error for binary / outside-root paths).
-6. Confirm **Recent runs** lists the run; click it to restore goal / root / attachments (re-run still needs Run).
-7. Switch to **Writing** or **Learn** (deterministic OK without Ollama for those recipes); Learn shows course id + attachments; Writing shows optional draft title.
-8. While a run is in progress, a second Run should fail with HTTP **409** (generation lock).
-9. Confirm there is no free JobType picker — only surface tabs.
+1. Start Ollama with `lacerta:latest` (needed for **chat** and Code **Quick file check**).
+2. Launch GUI; leave surface on **Code**; **Run check** = Quick file check; CTA reads **Run check**; goal: create `harness_smoke.py` that prints `HARNESS_OK`.
+3. Confirm job log shows plan / jobs, **Acceptance: pass** when the file is on disk, and preview works.
+4. Switch **Run check** to **Habit tracker (scaffold + tests)** (no Ollama required when deterministic). CTA becomes **Build habit tracker**. Confirm plan + acceptance.
+5. Switch to **Learn**; **Learn mode** = Build syllabus — course chrome visible, attachments required, CTA **Build syllabus**. Attach notes path; run; **Refresh course** → syllabus nodes + `corpus: pending`.
+6. Switch Learn mode to **Index sources** — attachments stay visible/required; CTA **Index sources**. Attach textbook/notes (`.md`/`.txt`/`.pdf`/`.docx`/`.html`/`.csv`); run; **Refresh course** → `corpus: complete` with chunk count. PDF/DOCX need `pip install -e ".[extract]"` (included in `[dev]`). After upgrading Lacerta, **re-run Index sources** so tables/math/figures become `[table]` / `[math]` / `[figure]` text surrogates in chunks (scanned bitmap-only pages stay placeholders unless you enable a local describe path later).
+7. Switch Learn mode to **Tutor** — attachments hidden; CTA **Ask tutor**; ask a **topical** question after Index sources. With Ollama up, reply teaches from retrieved chunks at the node’s mastery band (0–5). **Clear tutor session** resets digest/history. Course list shows `mastery N/5` per node.
+8. **Assessment** generates practice checks (difficulty follows Node id mastery). **Mastery check** mode requires Node id → generate MC → answer radios → **Submit mastery check** (pass increments tier; fail leaves unchanged). **Practice** mode: generate interactive MC (Python-graded, no mastery bump), **Flashcards** flip deck, **Study guide** markdown + preview; grounds on corpus when indexed (incl. `[table]`/`[math]`/`[figure]`).
+9. **Archive** — exploratory Q&A after Index sources (not tutoring). With Ollama up, reply synthesizes from retrieved chunks; otherwise a labeled retrieve paste. **Clear archive session** resets archive history only.
+10. Switch to **Research**; **Research mode** = Offline sources (attachments required); CTA **Research offline**. Large attachment sets auto-use keyword corpus bulk. **Light web (deferred)** fails honestly.
+11. Switch to **Writing**; **Writing mode** = Short draft or From sources (attachments only for From sources); CTA updates per mode.
+12. Switch to **Chat** — workspace root hidden; transcript + **Clear chat**; CTA **Send**. Ask a question; follow-up keeps prior turns. Job log polls while running.
+13. Concurrent run → **409**. No free JobType picker — only surface tabs + plain-language modes. Mode hint text appears under the mode select.
+
+CLI gate names stay on the harness; the GUI uses human labels only. **v1 exit met**; **v2 exit met** (V2.1–V2.5). MCP/Remote still deferred.
 
 ## API
 
-- `GET /api/surfaces` — surface defaults, allowlists, form hints (`show_attachments`, `show_course_id`, `show_title`)
-- `POST /api/run` — `{surface, goal, root?, light_research?, attachments?, course_id?, title?}` → manager status / plan / results / artifacts (409 if busy)
-- `GET /api/preview?path=&root=` — bounded text preview under workspace root (max 64 KiB)
-- `GET /api/history` — last N in-process runs (newest first)
+- `GET /api/surfaces` — surface defaults, allowlists, `code_scenarios`, `learn_scenarios`, `research_scenarios`, `writing_scenarios`
+- `POST /api/run` — `{surface, goal, root?, light_research?, attachments?, course_id?, title?, scenario?, messages?}` → **202** `{run_id, status: running}`
+- `GET /api/runs/{run_id}` — poll plan / results / artifacts / acceptance until finished|failed
+- `GET /api/learn/course?root=&course_id=&instance_id=` — read-only syllabus nodes + corpus status/chunk_count
+- `POST /api/learn/tutor/clear` — `{root?, course_id?, instance_id?}` wipe tutor digest + history index
+- `POST /api/learn/archive/clear` — wipe archive digest + history index (not tutor)
+- `POST /api/learn/mastery/check` — `{root?, course_id?, instance_id?, node_id}` load MC quiz (no correct answers)
+- `POST /api/learn/mastery/grade` — `{…, answers:[{question_id, selected_index}]}` Python grade; pass increments mastery
+- `POST /api/learn/practice/quiz` — load practice quiz (answers stripped)
+- `POST /api/learn/practice/grade` — Python grade + attempt record (no mastery bump)
+- `POST /api/learn/practice/flashcards` — generate deck JSON
+- `POST /api/learn/practice/study_guide` — generate markdown study guide
+- `GET /api/preview?path=&root=` — bounded text preview (max 64 KiB)
+- `GET /api/history` — last N in-process runs

@@ -52,9 +52,12 @@ LACERTA_LLM_DECOMPOSE=0 ./scripts/gate.sh writing_short --runs 1
 - [x] Preview is bounded (max bytes / text only)
 - [x] No MCP/Remote
 - [x] Disk remains SoT
+- [x] Manager not holding corpus chunk text / embeddings (N/A — no corpus in V1.1)
+- [x] No separate LearnRAG vs ResearchRAG (N/A — shared corpus deferred to V1.35)
+- [x] Disk / syllabus / corpus still SoT (GUI displays paths only)
 
 ---
 
 ## Out of scope
 
-Habit mode UI (V1.2), learn tutor (V1.3), corpus index (V1.35), web gather (V1.4), multi-turn chat (V1.5).
+Code Test/scenario UI (V1.2), learn tutor (V1.3), corpus index (V1.35), web gather (V1.4), multi-turn chat (V1.5).

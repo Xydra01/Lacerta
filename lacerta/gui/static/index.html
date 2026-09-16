@@ -19,17 +19,30 @@
     <nav class="tabs" id="tabs" aria-label="Surfaces"></nav>
 
     <section class="compose">
-      <label class="field">
-        <span>Goal</span>
-        <textarea id="goal" rows="4" placeholder="Describe the task…"></textarea>
+      <label class="field" id="scenarioWrap" hidden>
+        <span id="scenarioLabel">Run check</span>
+        <select id="scenario"></select>
       </label>
-      <label class="field">
-        <span>Workspace root</span>
-        <input id="root" type="text" autocomplete="off" />
-      </label>
-      <label class="field" id="courseWrap" hidden>
-        <span>Course id</span>
-        <input id="courseId" type="text" value="gui-course" autocomplete="off" />
+      <p class="mode-hint" id="modeHint" hidden></p>
+
+      <div id="learnCourseChrome" hidden>
+        <label class="field" id="courseWrap">
+          <span>Course id</span>
+          <input id="courseId" type="text" value="gui-course" autocomplete="off" />
+        </label>
+        <button type="button" id="refreshCourse" class="secondary">Refresh course</button>
+        <button type="button" id="clearTutorSession" class="secondary" hidden>Clear tutor session</button>
+        <button type="button" id="clearArchiveSession" class="secondary" hidden>Clear archive session</button>
+        <section class="course" id="coursePanel">
+          <h2>Course</h2>
+          <div id="courseMeta" class="course-meta"></div>
+          <ul id="courseNodes" class="course-nodes"></ul>
+        </section>
+      </div>
+
+      <label class="field" id="nodeWrap" hidden>
+        <span>Node id</span>
+        <input id="nodeId" type="text" placeholder="e.g. n1 from course list" autocomplete="off" />
       </label>
       <label class="field" id="titleWrap" hidden>
         <span>Draft title</span>
@@ -39,11 +52,53 @@
         <span>Attachments (one absolute path per line)</span>
         <textarea id="attachments" rows="3" placeholder="/Users/you/Documents/notes.md"></textarea>
       </label>
+
+      <label class="field">
+        <span id="goalLabel">Goal</span>
+        <textarea id="goal" rows="4" placeholder="Describe the task…"></textarea>
+      </label>
+      <label class="field" id="rootWrap">
+        <span>Workspace root</span>
+        <input id="root" type="text" autocomplete="off" />
+      </label>
+
       <label class="check" id="lightWrap" hidden>
         <input type="checkbox" id="light" />
         <span>Light research before answer</span>
       </label>
+      <section class="chat-session" id="chatSession" hidden>
+        <div class="chat-head">
+          <h2>Chat session</h2>
+          <button type="button" id="clearChat" class="secondary">Clear chat</button>
+        </div>
+        <div id="chatTranscript" class="chat-transcript" aria-live="polite"></div>
+      </section>
       <button type="button" id="run" class="run">Run</button>
+
+      <section class="mastery-quiz" id="masteryQuiz" hidden>
+        <h2>Mastery check</h2>
+        <div id="masteryQuizMeta" class="course-meta"></div>
+        <div id="masteryQuizBody"></div>
+        <button type="button" id="submitMastery" class="secondary">Submit mastery check</button>
+      </section>
+
+      <section class="practice-panel" id="practicePanel" hidden>
+        <h2>Practice</h2>
+        <div id="practiceQuizMeta" class="course-meta"></div>
+        <div id="practiceQuizBody"></div>
+        <div class="practice-actions">
+          <button type="button" id="submitPractice" class="secondary">Submit practice quiz</button>
+          <button type="button" id="genFlashcards" class="secondary">Flashcards</button>
+          <button type="button" id="genStudyGuide" class="secondary">Study guide</button>
+        </div>
+        <div id="flashcardDeck" class="flashcard-deck" hidden>
+          <div id="flashcardFace" class="flashcard-face"></div>
+          <div class="practice-actions">
+            <button type="button" id="flipFlashcard" class="secondary">Flip</button>
+            <button type="button" id="nextFlashcard" class="secondary">Next</button>
+          </div>
+        </div>
+      </section>
     </section>
 
     <section class="status" id="status" aria-live="polite"></section>

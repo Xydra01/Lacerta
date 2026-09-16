@@ -8,6 +8,10 @@ build/
 .env
 logs/
 /harness/
+
+# Local course corpora, GUI runs, and task drafts (chunks, mastery, logs).
+/instances/
+/tasks/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/

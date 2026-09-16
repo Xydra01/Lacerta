@@ -9,7 +9,7 @@ End-to-end setup for **Lacerta on a 2023 MacBook Air M2 (8GB)** using the `devMa
 - The thin local GUI at [http://127.0.0.1:8765/](http://127.0.0.1:8765/)  
 - Verified harness gates (unit tests + optional model smoke)
 
-Related: [macOS profile notes](macos.md) · [Architecture v1](architecture-v1.md)
+Related: [macOS profile notes](macos.md) · [Architecture v1](architecture-v1.md) · [Architecture v2](architecture-v2.md) (v2 exit met) · [Phases](phases/README.md)
 
 ---
 
@@ -252,24 +252,33 @@ Open **http://127.0.0.1:8765/** in Safari or Chrome.
 
 ### First runs in the UI
 
-1. **Code (needs Ollama)**  
+1. **Code (needs Ollama for Quick file check)**  
    - Leave the **Code** tab selected.  
+   - **Run check:** Quick file check (default) or Habit tracker (scaffold + tests).  
    - Workspace root: leave the default, or set a folder you own (e.g. `/tmp/lacerta-demo`).  
-   - Goal example:  
+   - Goal example (quick check):  
      `Create harness_smoke.py that prints HARNESS_OK`  
-   - Click **Run**. Watch the job log; confirm the file appears under the workspace root.
+   - Click **Run**. Watch the job log for plan steps and **Acceptance** pass/fail; confirm files under the workspace root.  
+   - Habit tracker check can run without Ollama when `LACERTA_HABIT_MODE=deterministic` (default).
 
 2. **Writing / Learn (no hot model required for default recipes)**  
-   - Switch tabs and run a short goal.  
-   - Writing: optional draft title field. Learn: course id + attachment paths.  
+   - Writing: **Writing mode** = Short draft | From sources; optional draft title; From sources needs attachment paths.  
+   - Learn: **Learn mode** = Build syllabus | Tutor | Assessment | Index sources; course id + attachments for syllabus/index.  
+   - After syllabus, **Refresh course** shows node list and `corpus: pending`. After **Index sources**, status becomes `complete` with chunk count (keyword index on Mac; no embedding downloads).  
+   - STEM sources: Index emits `[table]` / `[math]` / `[figure]` text surrogates for retrieve. **Re-run Index sources** after upgrading so older corpora pick this up. Bitmap-only scanned pages get a figure placeholder unless a local describe path is enabled later.  
    - Check **Artifacts** for paths on disk; click a path to **Preview** (text, size-capped).
 
 3. **Chat**  
-   - Needs Ollama + `lacerta:latest`. Ask a short question; confirm a reply in the log.
+   - Needs Ollama + `lacerta:latest`. Ask a short question; confirm a reply in the log and **Chat session** transcript.  
+   - Ask a follow-up without clearing — prior turns are sent with the next Run. **Clear chat** resets the transcript.  
+   - Optional **Light research before answer** still works with multi-turn.
 
 4. **Research**  
-   - Paste absolute attachment paths (one per line), e.g. `/Users/you/Documents/notes.md`.  
-   - After Run, confirm artifacts, preview, and an entry under **Recent runs**.
+   - **Research mode** = Offline sources (default) or Light web (deferred).  
+   - Offline: paste absolute attachment paths (one per line); empty list is rejected in the GUI.  
+   - Supported attachment types: `.md` / `.txt` / `.pdf` / `.docx` / `.html` / `.csv` (PDF/DOCX need `pip install -e ".[dev]"` or `.[extract]`). Legacy `.doc` is rejected — save as `.docx`.  
+   - More than 3 files or >80KB total → keyword corpus under `tasks/.../research/corpus/` then top-k retrieve (not full concat).  
+   - After Run, confirm `report.md` in artifacts and preview.
 
 There is **no free “job type” picker** — only surface tabs. That is intentional (surfaces choose templates and allowlists).
 
@@ -298,7 +307,7 @@ Update this Mac branch later:
 
 ```bash
 git pull origin devMacOS
-pip install -e ".[dev]"         # if dependencies changed
+pip install -e ".[dev]"         # if dependencies changed (includes PDF/DOCX extract libs)
 # Only if Modelfile changed:
 ./scripts/setup-macos.sh
 ```
@@ -311,13 +320,32 @@ When `main` moves and you ask an agent to sync Mac changes, re-check that `Model
 
 | Surface | Needs Ollama? | Good first goal |
 |---------|---------------|-----------------|
-| **Code** | Yes | Create `harness_smoke.py` that prints `HARNESS_OK` |
-| **Chat** | Yes | Short factual question |
-| **Learn** | No (deterministic default) | Build a syllabus from local notes |
-| **Writing** | No (deterministic default) | Two-paragraph draft with a `#` title |
-| **Research** | No for offline recipe | Offline note from attached sources |
+| **Code** | Quick file check: yes; Habit tracker: no (deterministic) | **Run check** scenarios + acceptance in job log |
+| **Chat** | Yes | Multi-turn session + optional light research; Clear chat |
+| **Learn** | No (deterministic default) | Build syllabus / Tutor / Assessment / Index sources; course view + corpus status |
+| **Writing** | No (deterministic default) | Short draft or From sources; `#` title; `advance_when=single_draft` enforced in Python |
+| **Research** | No for offline recipe | Offline sources (attachments); bulk → keyword corpus; Light web deferred |
 
-CLI equivalents use `./scripts/gate.sh <scenario>` — scenarios: `smoke_write_file`, `learn_syllabus_files`, `habit_tracker`, `research_local`, `writing_short`.
+### v1 regression matrix
+
+```bash
+python -m pytest tests/ -q
+LACERTA_HABIT_MODE=deterministic ./scripts/gate.sh habit_tracker --runs 1
+./scripts/gate.sh writing_short --runs 1
+./scripts/gate.sh writing_from_sources --runs 1
+./scripts/gate.sh research_local --runs 1
+./scripts/gate.sh research_corpus_bulk --runs 1
+./scripts/gate.sh learn_syllabus_files --runs 1
+./scripts/gate.sh learn_corpus_retrieve --runs 1
+./scripts/gate.sh learn_corpus_structured --runs 1
+./scripts/gate.sh learn_quiz_roundtrip --runs 1
+./scripts/gate.sh learn_tutor_grounded --runs 1
+./scripts/gate.sh learn_archive_chat --runs 1
+# when Ollama is up:
+./scripts/gate.sh smoke_write_file --runs 1
+```
+
+CLI equivalents use `./scripts/gate.sh <scenario>` — scenarios: `smoke_write_file`, `learn_syllabus_files`, `learn_corpus_retrieve`, `learn_corpus_structured`, `learn_quiz_roundtrip`, `learn_tutor_grounded`, `learn_archive_chat`, `habit_tracker`, `research_local`, `research_corpus_bulk`, `writing_short`, `writing_from_sources`.
 
 ---
 

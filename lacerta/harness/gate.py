@@ -103,6 +103,7 @@ def run_scenario(name: str, *, runs: int = 1, client: OllamaClient | None = None
             "task_id": task_id,
             "deliverable_path": deliverable_path,
             "recipe_id": scenario.get("recipe_id"),
+            "use_corpus": scenario.get("use_corpus"),
             "deterministic_habit": scenario.get("deterministic_habit"),
         }
         # Drop Nones

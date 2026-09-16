@@ -13,8 +13,14 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+extract = [
+    "pypdf>=4",
+    "python-docx>=1.1",
+]
 dev = [
     "pytest>=8",
+    "pypdf>=4",
+    "python-docx>=1.1",
 ]
 
 [tool.setuptools.packages.find]

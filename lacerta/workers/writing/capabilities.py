@@ -65,17 +65,29 @@ def _writing_mode() -> str:
 
 def _deterministic_sections(ctx: CapabilityContext, brief: WritingBrief) -> list[dict[str, str]]:
     topic = str(ctx.extra.get("topic") or ctx.user_request or brief.title or "Topic")
+    data_root, task_id = _roots(ctx)
+    draft = storage.load_draft(data_root, task_id) or {}
+    scratch = str(draft.get("scratch") or "").strip()
+    excerpt = ""
+    if scratch:
+        excerpt = scratch.replace("\n", " ")[:280]
     p1 = (
         f"This short draft introduces {topic}. Local-first agents keep inference "
         f"and tools on the user's machine so acceptance can be judged against disk "
         f"artifacts rather than log theater. Privacy and latency both improve when "
         f"the filesystem remains the source of truth for edits."
     )
+    if excerpt:
+        p1 = (
+            f"{p1} Source excerpt: {excerpt}"
+        )
     p2 = (
         f"Lacerta's writing surface uses a Python recipe runner: draft sections into "
         f"a buffer, compile a single markdown title with section headings, then "
         f"finalize a deliverable. Advance rules such as single_draft are enforced in "
-        f"code before the file is written, matching the Supervisor–Worker design."
+        f"code before the file is written, matching the Supervisor–Worker design. "
+        f"When scope is from_sources, ingest runs first so scratch notes inform the draft. "
+        f"Keep the deliverable long enough for harness honesty checks."
     )
     return [
         {"header": "Introduction", "body": p1},
@@ -84,6 +96,8 @@ def _deterministic_sections(ctx: CapabilityContext, brief: WritingBrief) -> list
 
 
 def ingest_sources(ctx: CapabilityContext, inp: IngestInput) -> CapabilityResult:
+    from lacerta.storage.extract import ExtractError, extract_text
+
     data_root, task_id = _roots(ctx)
     draft = storage.load_draft(data_root, task_id) or storage.default_draft(
         title=_brief(ctx).title
@@ -95,8 +109,12 @@ def ingest_sources(ctx: CapabilityContext, inp: IngestInput) -> CapabilityResult
         chunks.append(c)
     for a in ctx.attachments:
         p = Path(a)
-        if p.is_file():
-            chunks.append(p.read_text(encoding="utf-8", errors="replace"))
+        if not p.is_file():
+            continue
+        try:
+            chunks.append(extract_text(p))
+        except ExtractError as e:
+            return CapabilityResult.failure(e.code, e.message)
     text = "\n\n".join(x for x in chunks if x and str(x).strip())
     if not text.strip() and not draft.get("scratch"):
         return CapabilityResult.failure("empty_ingest", "No sources to ingest")
@@ -129,7 +147,11 @@ def draft_sections(ctx: CapabilityContext, inp: DraftSectionInput) -> Capability
         header = storage.strip_heading_marks(inp.section_header or "Section")
         body = storage.strip_heading_marks(inp.section_body or "")
         draft.setdefault("sections", []).append({"header": header, "body": body})
-    elif _writing_mode() == "deterministic" or not ctx.client:
+    elif (
+        brief.scope == "from_sources"
+        or _writing_mode() == "deterministic"
+        or not ctx.client
+    ):
         if not draft.get("sections"):
             draft["title"] = storage.strip_heading_marks(
                 brief.title or ctx.user_request or "Writing Draft"

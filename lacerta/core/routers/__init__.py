@@ -6,9 +6,24 @@ from typing import TYPE_CHECKING, Protocol
 
 from lacerta.core.routers.chat import CHAT_TEMPLATES, ChatPlainTemplate
 from lacerta.core.routers.code import CODE_TEMPLATES, CodeHabitTemplate, CodeSmokeTemplate
-from lacerta.core.routers.learn import LEARN_TEMPLATES, LearnSyllabusFilesTemplate
-from lacerta.core.routers.research import RESEARCH_TEMPLATES, ResearchOfflineTemplate
-from lacerta.core.routers.writing import WRITING_TEMPLATES, WritingShortTemplate
+from lacerta.core.routers.learn import (
+    LEARN_TEMPLATES,
+    LearnArchiveChatTemplate,
+    LearnAssessmentTemplate,
+    LearnIndexCorpusTemplate,
+    LearnSyllabusFilesTemplate,
+    LearnTutorTemplate,
+)
+from lacerta.core.routers.research import (
+    RESEARCH_TEMPLATES,
+    ResearchOfflineTemplate,
+    ResearchWebTemplate,
+)
+from lacerta.core.routers.writing import (
+    WRITING_TEMPLATES,
+    WritingFromSourcesTemplate,
+    WritingShortTemplate,
+)
 
 if TYPE_CHECKING:
     from lacerta.core.jobs import JobSpec
@@ -60,8 +75,14 @@ __all__ = [
     "ChatPlainTemplate",
     "CodeHabitTemplate",
     "CodeSmokeTemplate",
+    "LearnArchiveChatTemplate",
+    "LearnAssessmentTemplate",
+    "LearnIndexCorpusTemplate",
     "LearnSyllabusFilesTemplate",
+    "LearnTutorTemplate",
     "ResearchOfflineTemplate",
+    "ResearchWebTemplate",
+    "WritingFromSourcesTemplate",
     "WritingShortTemplate",
     "TEMPLATES",
     "TemplateRouter",

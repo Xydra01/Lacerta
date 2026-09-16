@@ -61,6 +61,7 @@ class ChatPlainTemplate:
             objective=state.goal,
             inputs={
                 "context": context or str(state.inputs.get("context") or ""),
+                "messages": list(state.inputs.get("messages") or []),
                 "root": str(state.inputs.get("root") or "."),
             },
             tools=[],

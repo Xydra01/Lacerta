@@ -26,6 +26,47 @@ LEARN_RECIPES = {
             "learn.finalize_course",
         ),
     ),
+    "learn.tutor_turn": Recipe(
+        recipe_id="learn.tutor_turn",
+        title="Tutor turn",
+        description="One grounded tutor reply from syllabus + bounded notes or corpus retrieve",
+        capability_ids=("learn.tutor_turn",),
+    ),
+    "learn.assessment": Recipe(
+        recipe_id="learn.assessment",
+        title="Generate assessments",
+        description="Write structured assessments under assessments/",
+        capability_ids=("learn.generate_assessments",),
+    ),
+    "learn.mastery_check": Recipe(
+        recipe_id="learn.mastery_check",
+        title="Mastery check",
+        description="Generate MC mastery check for one syllabus node",
+        capability_ids=("learn.mastery_check",),
+    ),
+    "learn.practice_quiz": Recipe(
+        recipe_id="learn.practice_quiz",
+        title="Practice quiz",
+        description="Generate MC practice quiz (± corpus retrieve)",
+        capability_ids=("learn.generate_quiz",),
+    ),
+    "learn.archive_chat": Recipe(
+        recipe_id="learn.archive_chat",
+        title="Archive chat",
+        description="Retrieve-grounded archive reply",
+        capability_ids=("learn.archive_chat",),
+    ),
+    "learn.index_corpus": Recipe(
+        recipe_id="learn.index_corpus",
+        title="Index course corpus",
+        description="Multi-pass index via shared corpus.index_sources",
+        capability_ids=(
+            "corpus.extract",
+            "corpus.chunk",
+            "corpus.map",
+            "corpus.embed",
+        ),
+    ),
 }
 
 

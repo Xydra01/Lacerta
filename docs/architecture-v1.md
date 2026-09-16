@@ -1,7 +1,7 @@
 # Lacerta v1 Architecture
 
-**Status:** active product architecture (v1 track)  
-**Date:** 2026-09-06  
+**Status:** **v1 exit met** (V1.0–V1.5); MCP/Remote (L9–L12) remain deferred  
+**Date:** 2026-09-14  
 **Supersedes for planning:** v0 “thin GUI then MCP/Remote” ship order  
 **Does not replace:** the Supervisor–Worker blueprint trio (still normative for core rules)
 
@@ -10,7 +10,8 @@
 | [lacerta-supervisor-worker-viability.md](../lacerta-supervisor-worker-viability.md) | Core Supervisor–Worker rules, do/don't |
 | [lacerta-port-kit.md](../lacerta-port-kit.md) | CodeWorker, IPC, schema, harness |
 | [lacerta-surfaces-and-recipes.md](../lacerta-surfaces-and-recipes.md) | Surface contracts & recipes |
-| [docs/phases/README.md](phases/README.md) | Phase index (v0 complete, v1 active, MCP deferred) |
+| [docs/phases/README.md](phases/README.md) | Phase index (v0/v1 complete, **v2 planned**, MCP deferred) |
+| [Architecture v2](architecture-v2.md) | Next product track — Learn UX / LLM tutoring |
 
 ---
 
@@ -19,8 +20,9 @@
 | Version | Meaning | Exit |
 |---------|---------|------|
 | **v0** | Harness-honest core: L0–L8 (manager, five surfaces, thin GUI stub, flagged LLM decompose) | Gates green; `python -m lacerta.gui` launches |
-| **v1** | **Productize** existing surfaces + GUI so a human can usefully run chat/code/learn/research/writing locally | Phase V1.5 exit; still one manager; still no MCP/Remote required |
-| **Later (deferred)** | Former L9–L12: MCP host/client, Remote companion, SSE mount | Resume only after v1 exit; same manager wrap |
+| **v1** | **Productize** existing surfaces + GUI so a human can usefully run chat/code/learn/research/writing locally | **Met (V1.5)** — one manager; still no MCP/Remote required |
+| **v2** | Decluttered Learn UX + LLM tutor / mastery / practice / Archive — see [architecture-v2.md](architecture-v2.md) | Planned (V2.0–V2.5) |
+| **Later (deferred)** | Former L9–L12: MCP host/client, Remote companion, SSE mount | Resume only after deliberate decision; same manager wrap |
 
 **v1 is not a second orchestrator.** It deepens templates, recipes, GUI forms, and honesty around deliverables.
 
@@ -72,12 +74,12 @@ v1 adds:
 |------------|---------|-----------|
 | Surface tabs | Yes | Keep |
 | Goal + root + Run | Yes | Keep |
-| Job log (summaries) | Yes | Live/poll updates |
-| Research attachments | API-only / empty | File picker + list |
-| Deliverables | Path strings | Open/list viewer |
-| Run history | None | Recent runs in-process |
-| Code modes | Smoke only | Smoke **and** habit selectable |
-| Chat | Single shot | Session continuity (multi-turn) |
+| Job log (summaries) | Yes | Live/poll updates (**done V1.5**) |
+| Research attachments | API-only / empty | Absolute **path list** in UI (**V1.1**; browsers cannot expose FS paths) |
+| Deliverables | Path strings | List + bounded text preview (**V1.1**) |
+| Run history | None | Recent runs in-process (**V1.1**) |
+| Code checks | Free goal / smoke only | **Test / premade scenarios** with plain labels (**V1.2**); harness ids stay CLI |
+| Chat | Single shot | Session continuity (multi-turn) (**done V1.5**) |
 
 Stack remains **stdlib HTTP + static UI** unless a later phase explicitly adopts a dependency (must stay thin; no second OS).
 
@@ -85,7 +87,7 @@ Stack remains **stdlib HTTP + static UI** unless a later phase explicitly adopts
 
 | Surface | v0 | v1 focus |
 |---------|----|----------|
-| **code** | smoke + habit (CLI) | Habit in GUI; clearer acceptance feedback |
+| **code** | smoke + habit (CLI gates) | GUI **Test / scenario** (plain labels → same templates); acceptance visible in job log |
 | **learn** | syllabus_files | Tutor / assessment / archive chat; **course-bound corpus** (textbook ingest → index → retrieve) |
 | **research** | offline local | Attachments UX; bounded web gather; **bulk corpus** instead of full-text concat when large |
 | **writing** | short dynamic | from_sources; multi-section pattern documented + GUI |
@@ -138,11 +140,34 @@ These remain first-class advantages in the blueprint; they wrap the same manager
 |-------|-------|----------------|
 | [V1.0](phases/phase-V1.0.md) | Charter + architecture | Docs landed; L9–L12 marked deferred |
 | [V1.1](phases/phase-V1.1.md) | GUI product shell | Attachments, deliverable viewer, run history |
-| [V1.2](phases/phase-V1.2.md) | Code depth in GUI | Habit mode selectable; acceptance visible |
+| [V1.2](phases/phase-V1.2.md) | Code checks & scenarios in GUI | Test / premade scenarios; acceptance visible |
 | [V1.3](phases/phase-V1.3.md) | Learn depth | Tutor/assessment/archive stub + course UI; course corpus paths reserved |
 | [V1.35](phases/phase-V1.35.md) | Shared corpus & multi-pass index | Extract→chunk→map→embed→retrieve; learn textbook harness |
 | [V1.4](phases/phase-V1.4.md) | Research & writing depth | from_sources + bounded gather; research bulk via corpus |
-| [V1.5](phases/phase-V1.5.md) | Chat continuity & v1 exit | Multi-turn chat + full regression bar (incl. corpus gate) |
+| [V1.5](phases/phase-V1.5.md) | Chat continuity & v1 exit | Multi-turn chat + full regression bar (incl. corpus gate) — **done** |
+
+---
+
+## 6.1 v1 regression matrix (exit bar)
+
+Run from repo root with venv active:
+
+```bash
+python -m pytest tests/ -q
+LACERTA_HABIT_MODE=deterministic ./scripts/gate.sh habit_tracker --runs 1
+./scripts/gate.sh writing_short --runs 1
+./scripts/gate.sh writing_from_sources --runs 1
+./scripts/gate.sh research_local --runs 1
+./scripts/gate.sh research_corpus_bulk --runs 1
+./scripts/gate.sh learn_syllabus_files --runs 1
+./scripts/gate.sh learn_corpus_retrieve --runs 1
+# when Ollama + lacerta:latest are healthy:
+./scripts/gate.sh smoke_write_file --runs 1
+```
+
+GUI manual: Chat multi-turn + Clear chat; job log updates while Running; Learn attach → Index sources → Tutor; Research Offline / Writing From sources.
+
+**L9–L12 remain deferred** after this exit.
 
 ---
 

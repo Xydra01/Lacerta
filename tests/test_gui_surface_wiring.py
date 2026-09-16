@@ -96,3 +96,75 @@ def test_gen_lock_already_held() -> None:
         acquire_generation(blocking=False)
     release_generation()
     assert generation_held() is False
+
+
+def test_code_scenarios_listed_with_plain_labels() -> None:
+    code = next(s for s in list_surfaces() if s["id"] == "code")
+    assert code["show_code_scenario"] is True
+    ids = {s["id"] for s in code["code_scenarios"]}
+    assert ids == {"quick_file_check", "habit_tracker"}
+    labels = {s["label"] for s in code["code_scenarios"]}
+    assert "Quick file check" in labels
+    assert "Habit tracker (scaffold + tests)" in labels
+    # Harness jargon must not appear in GUI labels
+    joined = " ".join(labels).lower()
+    assert "smoke" not in joined
+    assert "habit mode" not in joined
+
+
+def test_build_run_inputs_habit_tracker_scenario(tmp_path: Path) -> None:
+    inputs = build_run_inputs(
+        "code",
+        "Build habit tracker",
+        str(tmp_path),
+        scenario="habit_tracker",
+    )
+    assert inputs["template_id"] == "tpl.code.habit"
+    assert inputs["acceptance"] == {"habit_tracker": True}
+    assert inputs["deterministic_habit"] is True
+    assert inputs["scenario"] == "habit_tracker"
+
+
+def test_build_run_inputs_quick_file_check_default(tmp_path: Path) -> None:
+    inputs = build_run_inputs("code", "smoke goal", str(tmp_path))
+    assert inputs["template_id"] == "tpl.code.smoke"
+    assert inputs["scenario"] == "quick_file_check"
+    assert inputs["acceptance"]["file_contains"] == "HARNESS_OK"
+
+
+def test_build_run_inputs_invalid_scenario(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unknown code scenario"):
+        build_run_inputs("code", "x", str(tmp_path), scenario="not_a_real_check")
+
+
+def test_scenario_ui_flags_and_plain_language() -> None:
+    chat = next(s for s in list_surfaces() if s["id"] == "chat")
+    assert chat["show_workspace_root"] is False
+    assert chat["cta_label"] == "Send"
+    assert chat["goal_label"] == "Message"
+    assert chat["hint"]
+
+    learn = next(s for s in list_surfaces() if s["id"] == "learn")
+    for s in learn["learn_scenarios"]:
+        assert s["show_course_browser"] is True
+        assert s["cta_label"]
+        assert s["goal_label"]
+        assert s["show_workspace_root"] is True
+        joined = " ".join(
+            [s["label"], s["cta_label"], s["goal_label"], s.get("hint") or ""]
+        ).lower()
+        assert "learn_" not in joined
+        assert "jobtype" not in joined
+        assert "job_type" not in joined
+
+    by_id = {s["id"]: s for s in learn["learn_scenarios"]}
+    assert by_id["build_syllabus"]["require_attachments"] is True
+    assert by_id["index_sources"]["require_attachments"] is True
+    assert by_id["tutor"]["show_attachments"] is False
+    assert by_id["assessment"]["show_attachments"] is False
+
+    code = next(s for s in list_surfaces() if s["id"] == "code")
+    for s in code["code_scenarios"]:
+        assert s["cta_label"]
+        assert s["show_course_browser"] is False
+        assert "smoke" not in s["cta_label"].lower()

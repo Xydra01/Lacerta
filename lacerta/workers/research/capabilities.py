@@ -108,6 +108,8 @@ def read_notes(ctx: CapabilityContext, inp: ReadNotesInput) -> CapabilityResult:
 
 
 def ingest_offline(ctx: CapabilityContext, inp: IngestOfflineInput) -> CapabilityResult:
+    from lacerta.storage.extract import ExtractError, extract_text
+
     chunks: list[str] = []
     if inp.topic:
         chunks.append(f"# Topic\n{inp.topic}\n")
@@ -119,8 +121,13 @@ def ingest_offline(ctx: CapabilityContext, inp: IngestOfflineInput) -> Capabilit
         chunks.append(c)
     for a in ctx.attachments:
         p = Path(a)
-        if p.is_file():
-            chunks.append(f"## Source: {p.name}\n{p.read_text(encoding='utf-8', errors='replace')}\n")
+        if not p.is_file():
+            continue
+        try:
+            body = extract_text(p)
+        except ExtractError as e:
+            return CapabilityResult.failure(e.code, e.message)
+        chunks.append(f"## Source: {p.name}\n{body}\n")
     text = "\n\n".join(x for x in chunks if x and str(x).strip())
     if not text.strip():
         return CapabilityResult.failure("empty_ingest", "No offline sources")
@@ -174,9 +181,77 @@ def finalize_deliverable(ctx: CapabilityContext, inp: FinalizeInput) -> Capabili
     )
 
 
+def synthesize_from_corpus(
+    ctx: CapabilityContext, inp: SynthesizeInput
+) -> CapabilityResult:
+    """Retrieve top-k corpus chunks and write notes (no full-source concat)."""
+    from lacerta.core.capabilities import run_capability
+    from lacerta.storage import corpus as corpus_storage
+
+    topic = inp.topic or ctx.user_request or "Research"
+    query = str(topic).strip() or "research summary"
+    croot = Path(str(ctx.extra.get("corpus_root") or ""))
+    if not croot.is_dir():
+        croot = corpus_storage.resolve_task_corpus_root(
+            ctx.data_root or ".", ctx.task_id or "task", surface="research"
+        )
+    meta = corpus_storage.load_meta(croot)
+    if meta.get("status") != "complete":
+        return CapabilityResult.failure(
+            "corpus_not_ready",
+            f"corpus status is {meta.get('status')!r}; index attachments first",
+        )
+    ret = run_capability(
+        "corpus.retrieve",
+        ctx,
+        {"query": query, "corpus_root": str(croot)},
+    )
+    if not ret.ok:
+        return ret
+    chunks = list(ret.data.get("chunks") or [])
+    citations = list(ret.data.get("citations") or [])
+    if not chunks:
+        return CapabilityResult.failure(
+            "no_chunks", "corpus retrieve returned no chunks for synthesis"
+        )
+    lines = [
+        f"# Topic\n{topic}\n",
+        "## Corpus retrieve (top-k)\n",
+    ]
+    for ch in chunks:
+        cid = ch.get("chunk_id")
+        src = ch.get("source")
+        text = str(ch.get("text") or "").strip()
+        lines.append(f"### [{cid} | {src}]\n{text}\n")
+    cite_line = "; ".join(
+        f"{c.get('chunk_id')} ({c.get('source')})" for c in citations[:10]
+    )
+    lines.append(f"## Citations\n{cite_line or '—'}\n")
+    lines.append(
+        f"## Synthesis: {topic}\n\n"
+        "- Grounded on retrieved corpus chunks only (bulk path).\n"
+        f"- Chunks used: {len(chunks)}.\n"
+    )
+    note = "\n".join(lines)
+    result = append_note(ctx, NoteInput(content=note))
+    if not result.ok:
+        return result
+    return CapabilityResult.success(
+        "Synthesized from corpus retrieve",
+        path=result.data.get("path"),
+        notes_path=result.data.get("notes_path"),
+        citations=citations,
+        chunk_count=len(chunks),
+        corpus_root=str(croot),
+    )
+
+
 def gather_web_sources(ctx: CapabilityContext, inp: GatherWebInput) -> CapabilityResult:
     del ctx, inp
-    return CapabilityResult.failure("not_implemented", "research.gather_web_sources deferred")
+    return CapabilityResult.failure(
+        "not_implemented",
+        "research.gather_web_sources deferred — use Offline sources mode",
+    )
 
 
 def light_web_context(ctx: CapabilityContext, inp: LightWebInput) -> CapabilityResult:
@@ -190,6 +265,14 @@ def register_research_capabilities() -> None:
         CapabilitySpec("research.read_notes", "Read notes", "", ReadNotesInput, read_notes, frozenset({"research"})),
         CapabilitySpec("research.ingest_offline", "Ingest offline", "", IngestOfflineInput, ingest_offline, frozenset({"research"})),
         CapabilitySpec("research.synthesize_notes", "Synthesize", "", SynthesizeInput, synthesize_notes, frozenset({"research"})),
+        CapabilitySpec(
+            "research.synthesize_from_corpus",
+            "Synthesize from corpus",
+            "Top-k retrieve then notes",
+            SynthesizeInput,
+            synthesize_from_corpus,
+            frozenset({"research"}),
+        ),
         CapabilitySpec("research.compile_report", "Compile", "", CompileInput, compile_report, frozenset({"research"})),
         CapabilitySpec("research.finalize_deliverable", "Finalize", "", FinalizeInput, finalize_deliverable, frozenset({"research"})),
         CapabilitySpec("research.gather_web_sources", "Gather web", "", GatherWebInput, gather_web_sources, frozenset({"research"})),

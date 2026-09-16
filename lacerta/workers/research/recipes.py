@@ -15,10 +15,23 @@ RESEARCH_RECIPES = {
             "research.finalize_deliverable",
         ),
     ),
+    "research.offline_corpus": Recipe(
+        recipe_id="research.offline_corpus",
+        title="Offline research via corpus",
+        description="Index attachments → retrieve top-k → synthesize → finalize",
+        capability_ids=(
+            "corpus.extract",
+            "corpus.chunk",
+            "corpus.map",
+            "corpus.embed",
+            "research.synthesize_from_corpus",
+            "research.finalize_deliverable",
+        ),
+    ),
     "research.full_web": Recipe(
         recipe_id="research.full_web",
         title="Full web research",
-        description="Gather → synthesize → finalize",
+        description="Gather → synthesize → finalize (gather deferred)",
         capability_ids=(
             "research.gather_web_sources",
             "research.synthesize_notes",

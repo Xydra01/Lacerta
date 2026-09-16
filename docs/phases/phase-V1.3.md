@@ -1,6 +1,6 @@
 # Phase V1.3 — Learn depth
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** V1.1 (GUI shell); L3 syllabus green  
 **Exit:** Tutor and assessment (and archive-chat stub) runnable via manager; GUI can browse course/syllabus artifacts; course tree reserves corpus paths for V1.35  
 
@@ -16,14 +16,14 @@ Move learn beyond syllabus-build-only: ship recipe paths for tutor / assessment 
 
 ## Checkboxes
 
-- [ ] Recipes + worker dispatch for `learn_tutor_turn`, `learn_assessment` (archive chat may be stubbed but typed)
-- [ ] Templates or GUI mode switch: syllabus_files · tutor · assessment
-- [ ] GUI: show syllabus/course paths after syllabus run; basic node list from `syllabus.json` (read-only)
-- [ ] **Corpus path reservation:** course layout documents `corpus/` (or `corpus_id` pointer); empty/`status=pending` OK — no full indexer required yet
-- [ ] Tutor/assessment may still use short notes/syllabus context; do **not** concat entire textbook attachments into the manager
-- [ ] Harness or unit: assessment/tutor produces structured artifact or honest failure
-- [ ] Allowlist unchanged unless new JobTypes already present
-- [ ] No CodeWorker FS toolkit on learn jobs
+- [x] Recipes + worker dispatch for `learn_tutor_turn`, `learn_assessment` (archive chat may be stubbed but typed)
+- [x] Templates or GUI mode switch: syllabus_files · tutor · assessment
+- [x] GUI: show syllabus/course paths after syllabus run; basic node list from `syllabus.json` (read-only)
+- [x] **Corpus path reservation:** course layout documents `corpus/` (or `corpus_id` pointer); empty/`status=pending` OK — no full indexer required yet
+- [x] Tutor/assessment may still use short notes/syllabus context; do **not** concat entire textbook attachments into the manager
+- [x] Harness or unit: assessment/tutor produces structured artifact or honest failure
+- [x] Allowlist unchanged unless new JobTypes already present
+- [x] No CodeWorker FS toolkit on learn jobs
 
 ---
 
@@ -51,10 +51,10 @@ pytest tests/test_learn_syllabus_gate.py tests/ -q -k learn
 
 ## Architecture PR checklist
 
-- [ ] Learn remains recipe runner
-- [ ] syllabus.json SoT
-- [ ] No dual orchestrator
-- [ ] No manager-held full-file ingest for large attachments
+- [x] Learn remains recipe runner
+- [x] syllabus.json SoT
+- [x] No dual orchestrator
+- [x] No manager-held full-file ingest for large attachments
 
 ---
 

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import json
 import mimetypes
+import threading
 import time
+import uuid
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -12,17 +14,28 @@ from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from lacerta.core.gen_lock import GenerationBusy, acquire_generation, release_generation
-from lacerta.core.manager import run_manager
+from lacerta.core.manager import MacroState, run_manager
 from lacerta.core.ollama_client import OllamaClient
-from lacerta.gui.surfaces import build_run_inputs, default_root, list_surfaces
+from lacerta.gui.surfaces import (
+    build_run_inputs,
+    code_scenario_needs_ollama,
+    default_root,
+    learn_scenario_needs_ollama,
+    list_surfaces,
+)
+from lacerta.workers.learn import storage as learn_storage
+
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 PREVIEW_MAX_BYTES = 64 * 1024
 HISTORY_MAX = 20
+ACTIVE_RUNS_MAX = 40
 
 # In-process recent runs (newest appended; exposed newest-first).
 _run_history: deque[dict[str, Any]] = deque(maxlen=HISTORY_MAX)
+_active_runs: dict[str, dict[str, Any]] = {}
+_active_lock = threading.Lock()
 
 
 def clear_run_history() -> None:
@@ -30,9 +43,21 @@ def clear_run_history() -> None:
     _run_history.clear()
 
 
+def clear_active_runs() -> None:
+    """Test helper: reset in-process active run registry."""
+    with _active_lock:
+        _active_runs.clear()
+
+
 def get_run_history() -> list[dict[str, Any]]:
     """Newest-first snapshot of recent runs."""
     return list(reversed(_run_history))
+
+
+def get_active_run(run_id: str) -> dict[str, Any] | None:
+    with _active_lock:
+        rec = _active_runs.get(run_id)
+        return dict(rec) if rec else None
 
 
 def _json_response(handler: BaseHTTPRequestHandler, code: int, payload: dict[str, Any]) -> None:
@@ -70,6 +95,24 @@ def _normalize_attachments(raw: Any) -> list[str]:
                 out.append(s)
         return out
     raise ValueError("attachments must be a list of paths or newline-separated text")
+
+
+def _normalize_messages(raw: Any) -> list[dict[str, str]]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("messages must be a list of {role, content}")
+    out: list[dict[str, str]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        role = str(item.get("role") or "").strip().lower()
+        if role not in ("user", "assistant"):
+            continue
+        content = str(item.get("content") or "").strip()
+        if content:
+            out.append({"role": role, "content": content})
+    return out
 
 
 def preview_file(*, path: str, root: str, max_bytes: int = PREVIEW_MAX_BYTES) -> dict[str, Any]:
@@ -120,11 +163,180 @@ def _record_history(entry: dict[str, Any]) -> None:
     _run_history.append(entry)
 
 
+def _acceptance_payload(state: MacroState) -> dict[str, Any] | None:
+    if state.acceptance_ok is True:
+        return {"ok": True, "failures": []}
+    if state.acceptance_ok is False:
+        return {"ok": False, "failures": list(state.acceptance_failures or [])}
+    return None
+
+
+def _collect_artifacts(state: MacroState, inputs: dict[str, Any], root: str) -> list[str]:
+    artifacts: list[str] = []
+    for r in state.results:
+        for a in r.get("artifacts") or []:
+            artifacts.append(str(a))
+    if dp := inputs.get("deliverable_path"):
+        p = Path(str(dp))
+        if not p.is_absolute():
+            p = Path(root) / p
+        artifacts.append(str(p))
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for a in artifacts:
+        if a not in seen:
+            seen.add(a)
+            uniq.append(a)
+    return uniq
+
+
+def _snapshot_state(
+    run_id: str,
+    *,
+    surface: str,
+    goal: str,
+    root: str,
+    attachments: list[str],
+    inputs: dict[str, Any],
+    state: MacroState,
+) -> dict[str, Any]:
+    acceptance = _acceptance_payload(state)
+    return {
+        "run_id": run_id,
+        "status": state.status if state.status != "running" else "running",
+        "error": state.error,
+        "plan": list(state.plan),
+        "results": list(state.results),
+        "artifacts": _collect_artifacts(state, inputs, root),
+        "steps": state.steps,
+        "surface": surface,
+        "template_id": inputs.get("template_id"),
+        "task_id": inputs.get("task_id"),
+        "root": root,
+        "goal": goal,
+        "attachments": attachments,
+        "course_id": inputs.get("course_id"),
+        "title": inputs.get("title"),
+        "scenario": inputs.get("scenario"),
+        "acceptance": acceptance,
+    }
+
+
+def _update_active(run_id: str, payload: dict[str, Any]) -> None:
+    with _active_lock:
+        _active_runs[run_id] = payload
+        # Bound memory: drop oldest finished entries beyond cap.
+        if len(_active_runs) > ACTIVE_RUNS_MAX:
+            finished = [
+                rid
+                for rid, rec in _active_runs.items()
+                if rec.get("status") in ("finished", "failed")
+            ]
+            for rid in finished[: max(0, len(_active_runs) - ACTIVE_RUNS_MAX)]:
+                _active_runs.pop(rid, None)
+
+
+def _execute_run(
+    run_id: str,
+    *,
+    surface: str,
+    goal: str,
+    root: str,
+    attachments: list[str],
+    inputs: dict[str, Any],
+    client: OllamaClient | None,
+) -> None:
+    def on_progress(state: MacroState) -> None:
+        _update_active(
+            run_id,
+            _snapshot_state(
+                run_id,
+                surface=surface,
+                goal=goal,
+                root=root,
+                attachments=attachments,
+                inputs=inputs,
+                state=state,
+            ),
+        )
+
+    try:
+        state = run_manager(
+            goal,
+            surface=surface,
+            inputs=inputs,
+            client=client,
+            on_progress=on_progress,
+        )
+        payload = _snapshot_state(
+            run_id,
+            surface=surface,
+            goal=goal,
+            root=root,
+            attachments=attachments,
+            inputs=inputs,
+            state=state,
+        )
+        _update_active(run_id, payload)
+        _record_history(
+            {
+                "ts": time.time(),
+                "run_id": run_id,
+                "status": state.status,
+                "surface": surface,
+                "goal_snippet": goal[:120],
+                "goal": goal,
+                "root": root,
+                "template_id": inputs.get("template_id"),
+                "artifacts": payload["artifacts"],
+                "attachments": attachments,
+                "course_id": inputs.get("course_id"),
+                "title": inputs.get("title"),
+                "scenario": inputs.get("scenario"),
+                "acceptance": payload.get("acceptance"),
+                "error": state.error,
+            }
+        )
+    except Exception as e:
+        _update_active(
+            run_id,
+            {
+                "run_id": run_id,
+                "status": "failed",
+                "error": str(e),
+                "plan": [],
+                "results": [],
+                "artifacts": [],
+                "steps": 0,
+                "surface": surface,
+                "goal": goal,
+                "root": root,
+                "attachments": attachments,
+                "acceptance": None,
+            },
+        )
+        _record_history(
+            {
+                "ts": time.time(),
+                "run_id": run_id,
+                "status": "failed",
+                "surface": surface,
+                "goal_snippet": goal[:120],
+                "goal": goal,
+                "root": root,
+                "error": str(e),
+                "artifacts": [],
+                "attachments": attachments,
+            }
+        )
+    finally:
+        release_generation()
+
+
 class LacertaHandler(BaseHTTPRequestHandler):
     server_version = "LacertaGUI/0.1"
 
     def log_message(self, fmt: str, *args: Any) -> None:
-        # Quiet default console spam; still show errors via print in handlers.
         return
 
     def do_GET(self) -> None:  # noqa: N802
@@ -141,6 +353,24 @@ class LacertaHandler(BaseHTTPRequestHandler):
             return
         if path == "/api/history":
             _json_response(self, 200, {"runs": get_run_history()})
+            return
+        if path.startswith("/api/runs/"):
+            run_id = path[len("/api/runs/") :].strip("/")
+            if not run_id or "/" in run_id:
+                _json_response(self, 404, {"error": "not found"})
+                return
+            rec = get_active_run(run_id)
+            if rec is None:
+                _json_response(self, 404, {"error": "unknown run_id"})
+                return
+            _json_response(self, 200, rec)
+            return
+        if path == "/api/learn/course":
+            root = (qs.get("root") or [default_root()])[0]
+            course_id = (qs.get("course_id") or ["gui-course"])[0].strip() or "gui-course"
+            instance_id = (qs.get("instance_id") or ["gui"])[0].strip() or "gui"
+            payload = learn_storage.load_course_browse(root, instance_id, course_id)
+            _json_response(self, 200, payload)
             return
         if path == "/api/preview":
             file_path = (qs.get("path") or [""])[0]
@@ -162,7 +392,6 @@ class LacertaHandler(BaseHTTPRequestHandler):
             rel = path[len("/static/") :]
             self._serve_file(STATIC_DIR / rel)
             return
-        # Convenience: /app.css → static
         name = path.lstrip("/")
         candidate = STATIC_DIR / name
         if candidate.is_file():
@@ -172,6 +401,260 @@ class LacertaHandler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:  # noqa: N802
         path = urlparse(self.path).path
+        if path == "/api/learn/tutor/clear":
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            course_root = learn_storage.ensure_course_dirs(root, instance_id, course_id)
+            payload = learn_storage.clear_tutor_session(course_root)
+            _json_response(self, 200, payload)
+            return
+        if path == "/api/learn/archive/clear":
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            course_root = learn_storage.ensure_course_dirs(root, instance_id, course_id)
+            payload = learn_storage.clear_archive_session(course_root)
+            _json_response(self, 200, payload)
+            return
+        if path == "/api/learn/mastery/grade":
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            node_id = str(data.get("node_id") or "").strip()
+            answers = data.get("answers")
+            if not node_id:
+                _json_response(self, 400, {"error": "node_id is required"})
+                return
+            if not isinstance(answers, list):
+                _json_response(self, 400, {"error": "answers must be a list"})
+                return
+            from lacerta.workers.learn import capabilities as learn_caps
+
+            course_root = learn_storage.ensure_course_dirs(root, instance_id, course_id)
+            payload = learn_caps.grade_mastery_check(course_root, node_id, answers)
+            status = 200 if payload.get("ok") else 400
+            _json_response(self, status, payload)
+            return
+        if path == "/api/learn/mastery/check":
+            # Return latest generated mastery check JSON for GUI MC rendering
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            node_id = str(data.get("node_id") or "").strip()
+            if not node_id:
+                _json_response(self, 400, {"error": "node_id is required"})
+                return
+            course_root = learn_storage.course_dir(root, instance_id, course_id)
+            path_check = learn_storage.mastery_check_path(course_root, node_id)
+            doc = learn_storage.read_json(path_check)
+            if not doc:
+                _json_response(self, 404, {"error": "mastery check not found"})
+                return
+            # Strip correct_index from client payload? Keep for thin local GUI honesty —
+            # grade is still server-side. Hide answers from response for slightly less spoiler:
+            safe_qs = []
+            for q in doc.get("questions") or []:
+                if not isinstance(q, dict):
+                    continue
+                safe_qs.append(
+                    {
+                        "id": q.get("id"),
+                        "prompt": q.get("prompt"),
+                        "choices": q.get("choices"),
+                        "node_id": q.get("node_id"),
+                        "target_tier": q.get("target_tier"),
+                    }
+                )
+            _json_response(
+                self,
+                200,
+                {
+                    "node_id": doc.get("node_id"),
+                    "title": doc.get("title"),
+                    "current_tier": doc.get("current_tier"),
+                    "target_tier": doc.get("target_tier"),
+                    "questions": safe_qs,
+                },
+            )
+            return
+        if path == "/api/learn/practice/quiz":
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            node_id = str(data.get("node_id") or "").strip()
+            if not node_id:
+                _json_response(self, 400, {"error": "node_id is required"})
+                return
+            course_root = learn_storage.course_dir(root, instance_id, course_id)
+            path_quiz = learn_storage.quiz_path(course_root, node_id)
+            doc = learn_storage.read_json(path_quiz)
+            if not doc:
+                _json_response(self, 404, {"error": "practice quiz not found"})
+                return
+            safe_qs = []
+            for q in doc.get("questions") or []:
+                if not isinstance(q, dict):
+                    continue
+                safe_qs.append(
+                    {
+                        "id": q.get("id"),
+                        "prompt": q.get("prompt"),
+                        "choices": q.get("choices"),
+                        "node_id": q.get("node_id"),
+                        "target_tier": q.get("target_tier"),
+                    }
+                )
+            _json_response(
+                self,
+                200,
+                {
+                    "node_id": doc.get("node_id"),
+                    "title": doc.get("title"),
+                    "current_tier": doc.get("current_tier"),
+                    "target_tier": doc.get("target_tier"),
+                    "questions": safe_qs,
+                },
+            )
+            return
+        if path == "/api/learn/practice/grade":
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            node_id = str(data.get("node_id") or "").strip()
+            answers = data.get("answers")
+            if not node_id:
+                _json_response(self, 400, {"error": "node_id is required"})
+                return
+            if not isinstance(answers, list):
+                _json_response(self, 400, {"error": "answers must be a list"})
+                return
+            from lacerta.workers.learn import capabilities as learn_caps
+
+            course_root = learn_storage.ensure_course_dirs(root, instance_id, course_id)
+            payload = learn_caps.grade_practice_quiz(course_root, node_id, answers)
+            status = 200 if payload.get("ok") else 400
+            _json_response(self, status, payload)
+            return
+        if path == "/api/learn/practice/flashcards":
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            node_id = str(data.get("node_id") or "").strip()
+            if not node_id:
+                _json_response(self, 400, {"error": "node_id is required"})
+                return
+            from lacerta.core.capabilities import CapabilityContext, run_capability
+            from lacerta.workers.learn import capabilities as _lc  # noqa: F401
+
+            ctx = CapabilityContext(
+                data_root=root,
+                instance_id=instance_id,
+                course_id=course_id,
+                extra={"data_root": root, "node_id": node_id},
+            )
+            result = run_capability(
+                "learn.generate_flashcards",
+                ctx,
+                {"node_id": node_id},
+            )
+            if not result.ok:
+                _json_response(
+                    self,
+                    400,
+                    {"error": result.error_message or result.error_code},
+                )
+                return
+            course_root = learn_storage.course_dir(root, instance_id, course_id)
+            doc = learn_storage.read_json(learn_storage.flashcards_path(course_root, node_id)) or {}
+            _json_response(
+                self,
+                200,
+                {
+                    "path": result.data.get("path"),
+                    "cards": doc.get("cards") or [],
+                    "node_id": node_id,
+                },
+            )
+            return
+        if path == "/api/learn/practice/study_guide":
+            try:
+                data = _read_json(self)
+            except ValueError as e:
+                _json_response(self, 400, {"error": str(e)})
+                return
+            root = str(data.get("root") or default_root()).strip() or default_root()
+            course_id = str(data.get("course_id") or "").strip() or "gui-course"
+            instance_id = str(data.get("instance_id") or "").strip() or "gui"
+            node_id = str(data.get("node_id") or "").strip()
+            if not node_id:
+                _json_response(self, 400, {"error": "node_id is required"})
+                return
+            from lacerta.core.capabilities import CapabilityContext, run_capability
+            from lacerta.workers.learn import capabilities as _lc  # noqa: F401
+
+            ctx = CapabilityContext(
+                data_root=root,
+                instance_id=instance_id,
+                course_id=course_id,
+                extra={"data_root": root, "node_id": node_id},
+            )
+            result = run_capability(
+                "learn.generate_study_guide",
+                ctx,
+                {"node_id": node_id},
+            )
+            if not result.ok:
+                _json_response(
+                    self,
+                    400,
+                    {"error": result.error_message or result.error_code},
+                )
+                return
+            _json_response(
+                self,
+                200,
+                {
+                    "path": result.data.get("path"),
+                    "node_id": node_id,
+                },
+            )
+            return
         if path != "/api/run":
             _json_response(self, 404, {"error": "not found"})
             return
@@ -187,11 +670,14 @@ class LacertaHandler(BaseHTTPRequestHandler):
         light = bool(data.get("light_research"))
         course_id = str(data.get("course_id") or "").strip() or None
         title = str(data.get("title") or "").strip() or None
+        scenario = str(data.get("scenario") or "").strip() or None
+        node_id = str(data.get("node_id") or "").strip() or None
         if not surface or not goal:
             _json_response(self, 400, {"error": "surface and goal are required"})
             return
         try:
             attachments = _normalize_attachments(data.get("attachments"))
+            messages = _normalize_messages(data.get("messages")) if surface == "chat" else []
             inputs = build_run_inputs(
                 surface,
                 goal,
@@ -200,6 +686,9 @@ class LacertaHandler(BaseHTTPRequestHandler):
                 attachments=attachments,
                 course_id=course_id,
                 title=title,
+                scenario=scenario,
+                messages=messages or None,
+                node_id=node_id,
             )
         except ValueError as e:
             _json_response(self, 400, {"error": str(e)})
@@ -211,82 +700,74 @@ class LacertaHandler(BaseHTTPRequestHandler):
             _json_response(self, 409, {"error": str(e)})
             return
 
-        client: OllamaClient | None
+        client: OllamaClient | None = None
         try:
             client = OllamaClient()
             try:
                 client.health()
             except ConnectionError:
                 client = None
-            # Code and chat need Ollama; recipe surfaces can run deterministic without it.
-            if surface in ("code", "chat") and client is None:
+            needs_ollama = surface == "chat"
+            if surface == "code":
+                needs_ollama = code_scenario_needs_ollama(
+                    str(inputs.get("scenario") or scenario)
+                )
+            elif surface == "learn":
+                needs_ollama = learn_scenario_needs_ollama(
+                    str(inputs.get("scenario") or scenario)
+                )
+            if needs_ollama and client is None:
+                release_generation()
                 _json_response(
                     self,
                     503,
-                    {"error": "Ollama unreachable — required for code/chat surfaces"},
+                    {"error": "Ollama unreachable — required for this run"},
                 )
                 return
 
-            state = run_manager(
-                goal,
-                surface=surface,
-                inputs=inputs,
-                client=client,
-            )
-            artifacts: list[str] = []
-            for r in state.results:
-                for a in r.get("artifacts") or []:
-                    artifacts.append(str(a))
-            if dp := inputs.get("deliverable_path"):
-                p = Path(str(dp))
-                if not p.is_absolute():
-                    p = Path(root) / p
-                artifacts.append(str(p))
-            # de-dupe preserve order
-            seen: set[str] = set()
-            uniq: list[str] = []
-            for a in artifacts:
-                if a not in seen:
-                    seen.add(a)
-                    uniq.append(a)
-
-            payload = {
-                "status": state.status,
-                "error": state.error,
-                "plan": list(state.plan),
-                "results": list(state.results),
-                "artifacts": uniq,
-                "steps": state.steps,
-                "surface": surface,
-                "template_id": inputs.get("template_id"),
-                "task_id": inputs.get("task_id"),
-                "root": root,
-                "goal": goal,
-                "attachments": attachments,
-                "course_id": inputs.get("course_id"),
-                "title": inputs.get("title"),
-            }
-            _record_history(
+            run_id = uuid.uuid4().hex[:12]
+            _update_active(
+                run_id,
                 {
-                    "ts": time.time(),
-                    "status": state.status,
+                    "run_id": run_id,
+                    "status": "running",
+                    "error": None,
+                    "plan": [],
+                    "results": [],
+                    "artifacts": [],
+                    "steps": 0,
                     "surface": surface,
-                    "goal_snippet": goal[:120],
                     "goal": goal,
                     "root": root,
-                    "template_id": inputs.get("template_id"),
-                    "artifacts": uniq,
                     "attachments": attachments,
-                    "course_id": inputs.get("course_id"),
-                    "title": inputs.get("title"),
-                    "error": state.error,
-                }
+                    "template_id": inputs.get("template_id"),
+                    "task_id": inputs.get("task_id"),
+                    "scenario": inputs.get("scenario"),
+                    "acceptance": None,
+                },
             )
-            _json_response(self, 200, payload)
+            thread = threading.Thread(
+                target=_execute_run,
+                kwargs={
+                    "run_id": run_id,
+                    "surface": surface,
+                    "goal": goal,
+                    "root": root,
+                    "attachments": attachments,
+                    "inputs": inputs,
+                    "client": client,
+                },
+                daemon=True,
+            )
+            thread.start()
+            _json_response(
+                self,
+                202,
+                {"run_id": run_id, "status": "running"},
+            )
         except Exception as e:
-            _json_response(self, 500, {"error": str(e)})
-        finally:
             release_generation()
+            _json_response(self, 500, {"error": str(e)})
 
     def _serve_file(self, path: Path) -> None:
         if not path.is_file():

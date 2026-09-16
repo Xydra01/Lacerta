@@ -1,6 +1,6 @@
 # Phase V3.3 — Mode fields + color schemes + v3 exit
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** V3.1, V3.2  
 **Exit:** Mode-only inputs stay hidden (Draft title only on Writing modes that use it); default green theme plus two selectable darker schemes persist locally; v3 regression note in architecture-v3  
 
@@ -44,13 +44,13 @@ Finish the short polish track: no Writing-only (or Learn-only) boxes on Chat, Co
 
 ## Checkboxes
 
-- [ ] Draft title hidden unless the active Writing scenario sets `show_title`
-- [ ] `[hidden]` cannot be overridden by `.field` display rules
-- [ ] Scenario change and surface change both re-hide leaked fields (node id, attachments, course chrome, draft title)
-- [ ] Wiring test: chat/learn/code/research do not expose `show_title`
-- [ ] Theme switcher: Grove / Dusk / Ink; persists across reload
-- [ ] architecture-v3 status **v3 exit met**; phases README row updated
-- [ ] GUI README: replies, activity, themes, draft-title note
+- [x] Draft title hidden unless the active Writing scenario sets `show_title`
+- [x] `[hidden]` cannot be overridden by `.field` display rules
+- [x] Scenario change and surface change both re-hide leaked fields (node id, attachments, course chrome, draft title)
+- [x] Wiring test: chat/learn/code/research do not expose `show_title`
+- [x] Theme switcher: Grove / Dusk / Ink; persists across reload
+- [x] architecture-v3 status **v3 exit met**; phases README row updated
+- [x] GUI README: replies, activity, themes, draft-title note
 
 ---
 
@@ -78,9 +78,9 @@ Manual: switch Chat → Learn Tutor → Writing; Draft title only on the writing
 
 ## Architecture PR checklist
 
-- [ ] No new backend theme store
-- [ ] L9–L12 still deferred
-- [ ] Prior reply/activity behavior from V3.1–V3.2 still works under all three themes
+- [x] No new backend theme store
+- [x] L9–L12 still deferred
+- [x] Prior reply/activity behavior from V3.1–V3.2 still works under all three themes
 
 ---
 

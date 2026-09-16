@@ -1,6 +1,6 @@
 # Lacerta v3 Architecture (UI polish)
 
-**Status:** planned (docs charter)  
+**Status:** v3 exit met  
 **Depends on:** v2 exit met (V2.0–V2.5)  
 **Does not replace:** Supervisor–Worker blueprint; shared corpus; Learn recipes
 
@@ -64,7 +64,13 @@ Disk artifacts remain SoT; the panel is a view, not a second transcript store.
 
 ---
 
-## 5. Out of scope
+## 5. v3 regression
+
+pytest green for the GUI wiring and API checks. Prior v2 harness gates are not re-proven unless a GUI wiring test failed. Manual: Replies readable, activity visible while a run is in flight, Draft title absent on Tutor, theme switch sticks after reload. L9–L12 remain deferred.
+
+---
+
+## 6. Out of scope
 
 - MCP / Remote (L9–L12)
 - Replacing the stdlib HTTP GUI with a SPA framework

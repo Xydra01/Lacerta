@@ -310,6 +310,7 @@ def _teach_from_sources(
         f"Learner mastery for «{title}»: {tier}/5 — match difficulty. {band}"
     )
     try:
+        delta = getattr(client, "on_delta", None)
         result = client.chat(
             [
                 {"role": "system", "content": sys},
@@ -327,6 +328,8 @@ def _teach_from_sources(
                 },
             ],
             temperature=0.3,
+            stream=delta is not None,
+            on_delta=delta,
         )
         content = str(result.get("message", {}).get("content") or "").strip()
         return content or None

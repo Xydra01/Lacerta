@@ -44,44 +44,144 @@
   const previewEl = document.getElementById("preview");
   const historyEl = document.getElementById("history");
   const chatSessionEl = document.getElementById("chatSession");
-  const chatTranscriptEl = document.getElementById("chatTranscript");
+  const repliesEl = document.getElementById("replies");
+  const replyActivityEl = document.getElementById("replyActivity");
   const clearChatBtn = document.getElementById("clearChat");
 
   let surfaces = [];
   let surface = "code";
   let surfaceMeta = {};
   let chatMessages = [];
+  const statusReplies = {};
   let flashcards = [];
   let flashIdx = 0;
   let flashShowBack = false;
+
+  function setReplyActivity(label) {
+    if (!replyActivityEl) return;
+    if (!label) {
+      replyActivityEl.hidden = true;
+      replyActivityEl.textContent = "";
+      return;
+    }
+    replyActivityEl.hidden = false;
+    replyActivityEl.textContent = label;
+  }
+
+  function proseScenario(scenario) {
+    if (surface === "chat") return "chat";
+    if (scenario === "tutor" || scenario === "archive") return scenario;
+    return null;
+  }
+
+  function paintInFlight(data, goal, scenario) {
+    setReplyActivity(data.activity || "Working");
+    if (!proseScenario(scenario)) return;
+    const turns = [{ role: "user", content: goal }];
+    if (data.partial_reply || data.partial_reply_html) {
+      turns.push({
+        role: "assistant",
+        content: data.partial_reply || "",
+        html: data.partial_reply_html || "",
+      });
+    }
+    paintReplies(turns);
+  }
 
   function setStatus(text, kind) {
     statusEl.textContent = text || "";
     statusEl.className = "status" + (kind ? " " + kind : "");
   }
 
-  function renderChatTranscript() {
-    chatTranscriptEl.innerHTML = "";
-    if (!chatMessages.length) {
+  function learnReplyKind() {
+    if (surface !== "learn") return null;
+    const cur = currentScenarioMeta(currentMeta());
+    if (!cur) return null;
+    if (cur.id === "tutor" || cur.id === "archive") return cur.id;
+    return null;
+  }
+
+  function typesetMath(root) {
+    if (!root || typeof temml === "undefined" || !temml.render) return;
+    root.querySelectorAll(".math-inline, .math-display").forEach((el) => {
+      const tex = el.getAttribute("data-tex") || "";
+      const display = el.classList.contains("math-display");
+      try {
+        temml.render(tex, el, { throwOnError: true, displayMode: display });
+      } catch (err) {
+        el.textContent = tex;
+      }
+    });
+  }
+
+  function paintReplies(turns) {
+    repliesEl.innerHTML = "";
+    const list = turns || [];
+    if (!list.length) {
       const empty = document.createElement("div");
       empty.className = "chat-empty";
-      empty.textContent = "No turns yet — Send to start a multi-turn session.";
-      chatTranscriptEl.appendChild(empty);
+      empty.textContent = "No replies yet.";
+      repliesEl.appendChild(empty);
       return;
     }
-    chatMessages.forEach((m) => {
+    list.forEach((m) => {
       const div = document.createElement("div");
-      div.className = "chat-line";
+      const role = m.role === "assistant" ? "assistant" : "user";
+      div.className = "reply-line " + role;
       const who = document.createElement("span");
       who.className = "who";
-      who.textContent = m.role === "assistant" ? "Lacerta" : "You";
+      who.textContent = role === "assistant" ? "Lacerta" : "You";
       const body = document.createElement("div");
-      body.textContent = m.content || "";
+      body.className = "reply-body";
+      const html = m.html || m.text_html || "";
+      if (html && role === "assistant") {
+        body.innerHTML = html;
+      } else {
+        body.textContent = m.text || m.content || "";
+      }
       div.appendChild(who);
       div.appendChild(body);
-      chatTranscriptEl.appendChild(div);
+      repliesEl.appendChild(div);
     });
-    chatTranscriptEl.scrollTop = chatTranscriptEl.scrollHeight;
+    typesetMath(repliesEl);
+    repliesEl.scrollTop = repliesEl.scrollHeight;
+  }
+
+  function renderChatTranscript() {
+    paintReplies(
+      chatMessages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        html: m.html || "",
+      }))
+    );
+  }
+
+  async function loadLearnTurns(kind) {
+    const q = new URLSearchParams({
+      root: rootEl.value.trim(),
+      course_id: courseIdEl.value.trim() || "gui-course",
+      instance_id: "gui",
+      kind: kind,
+    });
+    const res = await fetch("/api/learn/turns?" + q.toString());
+    const data = await res.json();
+    if (!res.ok) return;
+    paintReplies(data.turns || []);
+  }
+
+  async function syncReplies() {
+    const kind = learnReplyKind();
+    if (surface === "chat") {
+      renderChatTranscript();
+      return;
+    }
+    if (kind) {
+      await loadLearnTurns(kind);
+      return;
+    }
+    const row = statusReplies[surface];
+    paintReplies(row ? [row] : []);
   }
 
   function clearChatSession() {
@@ -93,7 +193,7 @@
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
-  async function pollRun(runId) {
+  async function pollRun(runId, onTick) {
     const deadline = Date.now() + 10 * 60 * 1000;
     while (Date.now() < deadline) {
       const res = await fetch("/api/runs/" + encodeURIComponent(runId));
@@ -105,6 +205,7 @@
       if (data.status === "finished" || data.status === "failed") {
         return data;
       }
+      if (onTick) onTick(data);
       setStatus(
         `Running… plan=${(data.plan || []).join(" → ") || "—"} · steps=${data.steps || 0}`
       );
@@ -198,6 +299,7 @@
     const isArchive =
       meta.show_learn_scenario && cur && cur.id === "archive";
     clearArchiveSessionBtn.hidden = !isArchive;
+    titleWrap.hidden = !(cur && cur.show_title);
     nodeWrap.hidden = !(cur && cur.show_node_id);
     if (!(cur && cur.id === "mastery_check")) {
       masteryQuiz.hidden = true;
@@ -229,7 +331,6 @@
     const meta = currentMeta();
     lightWrap.hidden = surface !== "chat";
     chatSessionEl.hidden = surface !== "chat";
-    titleWrap.hidden = !meta.show_title;
     const showScenario = !!(
       meta.show_code_scenario ||
       meta.show_learn_scenario ||
@@ -254,6 +355,7 @@
       applyScenarioModeFields(meta);
     }
     if (surface === "chat") renderChatTranscript();
+    else syncReplies();
   }
 
   function renderTabs() {
@@ -325,6 +427,7 @@
         return;
       }
       renderCourse(data);
+      await syncReplies();
     } catch (e) {
       courseMeta.textContent = String(e);
     }
@@ -515,6 +618,7 @@
 
   scenarioEl.addEventListener("change", () => {
     applyScenarioModeFields(currentMeta());
+    syncReplies();
   });
 
   refreshCourseBtn.addEventListener("click", () => refreshCourse());
@@ -535,6 +639,7 @@
         return;
       }
       setStatus("Tutor session cleared.", "ok");
+      await syncReplies();
     } catch (e) {
       setStatus(String(e), "fail");
     }
@@ -556,6 +661,7 @@
         return;
       }
       setStatus("Archive session cleared.", "ok");
+      await syncReplies();
     } catch (e) {
       setStatus(String(e), "fail");
     }
@@ -625,8 +731,9 @@
         setStatus("Missing run_id from server", "fail");
         return;
       }
-      const data = await pollRun(runId);
+      const data = await pollRun(runId, (tick) => paintInFlight(tick, goal, body.scenario));
       renderLog(data);
+      setReplyActivity("");
       if (data.status === "finished") {
         const acc =
           data.acceptance && data.acceptance.ok === true
@@ -639,17 +746,26 @@
           "ok"
         );
         if (surface === "chat") {
-          const reply =
-            (data.results || [])
-              .slice()
-              .reverse()
-              .find((r) => r.ok && r.summary)?.summary || "";
+          const reply = data.reply || "";
           chatMessages.push({ role: "user", content: goal });
           if (reply) {
-            chatMessages.push({ role: "assistant", content: reply });
+            chatMessages.push({
+              role: "assistant",
+              content: reply,
+              html: data.reply_html || "",
+            });
           }
           renderChatTranscript();
           goalEl.value = "";
+        } else if (body.scenario === "tutor" || body.scenario === "archive") {
+          await loadLearnTurns(body.scenario);
+        } else if (data.reply) {
+          statusReplies[surface] = {
+            role: "assistant",
+            content: data.reply,
+            html: data.reply_html || "",
+          };
+          paintReplies([statusReplies[surface]]);
         }
         if (body.scenario === "mastery_check" && body.node_id) {
           await loadMasteryQuiz(body.node_id);
@@ -659,10 +775,15 @@
         }
       } else {
         setStatus(data.error || `Status: ${data.status}`, "fail");
+        if (proseScenario(body.scenario)) {
+          if (surface === "chat") renderChatTranscript();
+          else await syncReplies();
+        }
       }
       await refreshHistory();
       if (!learnCourseChrome.hidden) await refreshCourse();
     } catch (e) {
+      setReplyActivity("");
       setStatus(String(e), "fail");
     } finally {
       runBtn.disabled = false;
@@ -936,6 +1057,26 @@
       setStatus(String(e), "fail");
     }
   });
+
+  const THEME_KEY = "lacerta-theme";
+
+  function applyTheme(theme) {
+    const next = theme === "dusk" || theme === "ink" ? theme : "grove";
+    document.documentElement.dataset.theme = next;
+    try {
+      localStorage.setItem(THEME_KEY, next);
+    } catch (e) {
+      /* private mode */
+    }
+    document.querySelectorAll(".theme-switch button").forEach((btn) => {
+      btn.setAttribute("aria-pressed", btn.dataset.theme === next ? "true" : "false");
+    });
+  }
+
+  document.querySelectorAll(".theme-switch button").forEach((btn) => {
+    btn.addEventListener("click", () => applyTheme(btn.dataset.theme));
+  });
+  applyTheme(document.documentElement.dataset.theme || "grove");
 
   boot().catch((e) => setStatus(String(e), "fail"));
 })();

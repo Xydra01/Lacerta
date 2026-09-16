@@ -92,4 +92,4 @@ def test_build_run_inputs_writing_from_sources(tmp_path: Path) -> None:
     )
     assert inputs["template_id"] == "tpl.writing.from_sources"
     assert inputs["attachments"] == ["/tmp/a.md"]
-    assert inputs["title"] == "My Title"
+    assert "title" not in inputs

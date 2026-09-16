@@ -24,6 +24,19 @@ def _release_lock() -> None:
     release_generation()
 
 
+def test_draft_title_only_on_short_draft() -> None:
+    listed = {s["id"]: s for s in list_surfaces()}
+    for sid in ("chat", "learn", "code", "research"):
+        assert listed[sid]["show_title"] is False
+    writing = listed["writing"]
+    assert writing["show_title"] is False
+    by_id = {s["id"]: s for s in writing["writing_scenarios"]}
+    assert by_id["short_draft"]["show_title"] is True
+    assert by_id["from_sources"]["show_title"] is False
+    for scenario in listed["learn"]["learn_scenarios"]:
+        assert scenario.get("show_title") is False
+
+
 def test_each_surface_has_template_and_allowed_defaults() -> None:
     expected = {
         "chat": "tpl.chat.plain",

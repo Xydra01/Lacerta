@@ -1,6 +1,6 @@
 # Phase V3.2 — In-flight activity + buffered typing
 
-**Status:** planned  
+**Status:** done  
 **Depends on:** V3.1 (Replies panel + formatter exist)  
 **Exit:** While a run is going, the GUI shows step labels and the assistant reply grows in closed chunks (bold, italic, math only after their closers), so it looks like typing without flashing unfinished markdown  
 
@@ -42,13 +42,13 @@ Runs can take a while. Show both what the job is doing and the reply as it forms
 
 ## Checkboxes
 
-- [ ] `chat(stream=True)` parses NDJSON and still returns one dict; `stream=False` tests unchanged
-- [ ] `on_delta` optional; callers that ignore it keep working
-- [ ] Run poll exposes `partial_reply` during Tutor / Archive / Chat
-- [ ] Replies panel grows on each poll using the closed-prefix rule
-- [ ] Unclosed `$` or `**` does not render as a broken span
-- [ ] Failure clears the generating row
-- [ ] GUI README notes the typing behavior
+- [x] `chat(stream=True)` parses NDJSON and still returns one dict; `stream=False` tests unchanged
+- [x] `on_delta` optional; callers that ignore it keep working
+- [x] Run poll exposes `partial_reply` during Tutor / Archive / Chat
+- [x] Replies panel grows on each poll using the closed-prefix rule
+- [x] Unclosed `$` or `**` does not render as a broken span
+- [x] Failure clears the generating row
+- [x] GUI README notes the typing behavior
 
 ---
 
@@ -77,10 +77,10 @@ Manual: Tutor with Ollama — text appears in chunks; a `**bold**` phrase does n
 
 ## Architecture PR checklist
 
-- [ ] `chat()` return type unchanged
-- [ ] No SSE/WebSocket
-- [ ] Partial text not written as the disk SoT until the job finishes
-- [ ] Poll still single-flight (409 unchanged)
+- [x] `chat()` return type unchanged
+- [x] No SSE/WebSocket
+- [x] Partial text not written as the disk SoT until the job finishes
+- [x] Poll still single-flight (409 unchanged)
 
 ---
 

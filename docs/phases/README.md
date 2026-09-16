@@ -68,14 +68,14 @@ Numbered phase docs for building Lacerta from the blueprint trio, plus the **v1 
 
 ---
 
-## v3 — UI / UX polish (planned)
+## v3 — UI / UX polish
 
 | Phase | Title | Exit |
 |-------|-------|------|
 | [V3.0](phase-V3.0.md) | Charter | architecture-v3 + phase map — **docs** |
-| [V3.1](phase-V3.1.md) | Replies + formatting | Conversation panel; newlines, bold, italic, math |
-| [V3.2](phase-V3.2.md) | Activity + buffered typing | Step trace; reply grows in closed markdown chunks |
-| [V3.3](phase-V3.3.md) | Fields + themes + exit | Draft title scoped; Grove / Dusk / Ink |
+| [V3.1](phase-V3.1.md) | Replies + formatting | Conversation panel; newlines, bold, italic, math — **done** |
+| [V3.2](phase-V3.2.md) | Activity + buffered typing | Step trace; reply grows in closed markdown chunks — **done** |
+| [V3.3](phase-V3.3.md) | Fields + themes + exit | Draft title scoped; Grove / Dusk / Ink — **v3 exit met** |
 
 ---
 

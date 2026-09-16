@@ -35,6 +35,7 @@ ACTIVE_RUNS_MAX = 40
 # In-process recent runs (newest appended; exposed newest-first).
 _run_history: deque[dict[str, Any]] = deque(maxlen=HISTORY_MAX)
 _active_runs: dict[str, dict[str, Any]] = {}
+_partial_replies: dict[str, str] = {}
 _active_lock = threading.Lock()
 
 
@@ -47,6 +48,7 @@ def clear_active_runs() -> None:
     """Test helper: reset in-process active run registry."""
     with _active_lock:
         _active_runs.clear()
+        _partial_replies.clear()
 
 
 def get_run_history() -> list[dict[str, Any]]:
@@ -190,6 +192,85 @@ def _collect_artifacts(state: MacroState, inputs: dict[str, Any], root: str) -> 
     return uniq
 
 
+def _extract_reply(
+    state: MacroState,
+    inputs: dict[str, Any],
+    *,
+    surface: str,
+) -> str:
+    """Plain user-facing reply. Never the raw artifact JSON blob."""
+    for r in reversed(list(state.results or [])):
+        for raw in reversed(list(r.get("artifacts") or [])):
+            path = Path(str(raw))
+            if path.suffix.lower() != ".json" or not path.is_file():
+                continue
+            try:
+                doc = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                continue
+            if isinstance(doc, dict) and str(doc.get("reply") or "").strip():
+                return str(doc["reply"])
+    if surface == "chat":
+        for r in reversed(list(state.results or [])):
+            if r.get("ok") and str(r.get("summary") or "").strip():
+                return str(r["summary"])
+    if state.status == "failed":
+        return str(state.error or "Failed")
+    if state.status != "finished":
+        return ""
+    bits = ["Finished"]
+    if inputs.get("deliverable_path"):
+        bits.append(str(inputs["deliverable_path"]))
+    return " · ".join(bits)
+
+
+_TURN_CAP = 20
+
+
+def _learn_turns(course_root: Path, kind: str) -> list[dict[str, Any]]:
+    """Last turns as user/assistant rows. Text is question or reply, not JSON."""
+    from lacerta.gui.format_reply import render_html
+
+    if kind == "archive":
+        index = learn_storage.archive_history_path(course_root)
+    else:
+        index = learn_storage.tutor_history_path(course_root)
+    history = learn_storage.read_json(index) or {}
+    entries = list(history.get("turns") or [])[-_TURN_CAP:]
+    out: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        path_str = str(entry.get("path") or "")
+        if not path_str:
+            continue
+        turn = learn_storage.read_json(Path(path_str))
+        if not isinstance(turn, dict):
+            continue
+        ts = turn.get("ts") if turn.get("ts") is not None else entry.get("ts")
+        question = str(turn.get("question") or turn.get("message") or "").strip()
+        reply = str(turn.get("reply") or "").strip()
+        if question:
+            out.append(
+                {
+                    "role": "user",
+                    "text": question,
+                    "ts": ts,
+                    "text_html": render_html(question),
+                }
+            )
+        if reply:
+            out.append(
+                {
+                    "role": "assistant",
+                    "text": reply,
+                    "ts": ts,
+                    "text_html": render_html(reply),
+                }
+            )
+    return out
+
+
 def _snapshot_state(
     run_id: str,
     *,
@@ -201,7 +282,10 @@ def _snapshot_state(
     state: MacroState,
 ) -> dict[str, Any]:
     acceptance = _acceptance_payload(state)
-    return {
+    from lacerta.gui.format_reply import render_html
+
+    reply = _extract_reply(state, inputs, surface=surface)
+    payload = {
         "run_id": run_id,
         "status": state.status if state.status != "running" else "running",
         "error": state.error,
@@ -219,11 +303,62 @@ def _snapshot_state(
         "title": inputs.get("title"),
         "scenario": inputs.get("scenario"),
         "acceptance": acceptance,
+        "reply": reply,
+        "reply_html": render_html(reply) if reply else "",
     }
+    return payload
+
+
+def _activity_label(plan: list[Any], partial: str) -> str:
+    """One step label for the Replies panel while a run is in flight."""
+    last = str(plan[-1]) if plan else ""
+    if last.startswith("llm:"):
+        last = last[4:]
+    if partial and last in ("learn_tutor_turn", "learn_archive_chat", "chat_answer"):
+        return "Generating reply"
+    if last == "learn_index_corpus":
+        return "Indexing sources"
+    if last in ("learn_mastery_check", "learn_assessment", "learn_practice_quiz"):
+        return "Grading"
+    if last in ("research_light", "learn_tutor_turn", "learn_archive_chat"):
+        return "Retrieving"
+    return "Working"
+
+
+def _apply_partial(run_id: str, payload: dict[str, Any]) -> None:
+    """Merge the in-memory reply buffer. Finished/failed runs drop it."""
+    from lacerta.gui.format_reply import render_html
+
+    if payload.get("status") != "running":
+        _partial_replies.pop(run_id, None)
+        payload["partial_reply"] = ""
+        payload["partial_reply_html"] = ""
+        payload["activity"] = ""
+        return
+    partial = _partial_replies.get(run_id, "")
+    payload["partial_reply"] = partial
+    payload["partial_reply_html"] = (
+        render_html(partial, hide_unclosed_math=True) if partial else ""
+    )
+    payload["activity"] = _activity_label(list(payload.get("plan") or []), partial)
+
+
+def _set_partial_reply(run_id: str, text: str) -> None:
+    from lacerta.gui.format_reply import render_html
+
+    with _active_lock:
+        _partial_replies[run_id] = text
+        rec = _active_runs.get(run_id)
+        if rec is None or rec.get("status") != "running":
+            return
+        rec["partial_reply"] = text
+        rec["partial_reply_html"] = render_html(text, hide_unclosed_math=True)
+        rec["activity"] = _activity_label(list(rec.get("plan") or []), text)
 
 
 def _update_active(run_id: str, payload: dict[str, Any]) -> None:
     with _active_lock:
+        _apply_partial(run_id, payload)
         _active_runs[run_id] = payload
         # Bound memory: drop oldest finished entries beyond cap.
         if len(_active_runs) > ACTIVE_RUNS_MAX:
@@ -234,6 +369,7 @@ def _update_active(run_id: str, payload: dict[str, Any]) -> None:
             ]
             for rid in finished[: max(0, len(_active_runs) - ACTIVE_RUNS_MAX)]:
                 _active_runs.pop(rid, None)
+                _partial_replies.pop(rid, None)
 
 
 def _execute_run(
@@ -259,6 +395,9 @@ def _execute_run(
                 state=state,
             ),
         )
+
+    if client is not None:
+        client.on_delta = lambda text: _set_partial_reply(run_id, text)  # type: ignore[attr-defined]
 
     try:
         state = run_manager(
@@ -371,6 +510,17 @@ class LacertaHandler(BaseHTTPRequestHandler):
             instance_id = (qs.get("instance_id") or ["gui"])[0].strip() or "gui"
             payload = learn_storage.load_course_browse(root, instance_id, course_id)
             _json_response(self, 200, payload)
+            return
+        if path == "/api/learn/turns":
+            root = (qs.get("root") or [default_root()])[0]
+            course_id = (qs.get("course_id") or ["gui-course"])[0].strip() or "gui-course"
+            instance_id = (qs.get("instance_id") or ["gui"])[0].strip() or "gui"
+            kind = (qs.get("kind") or ["tutor"])[0].strip().lower()
+            if kind not in ("tutor", "archive"):
+                _json_response(self, 400, {"error": "kind must be tutor or archive"})
+                return
+            course_root = learn_storage.course_dir(root, instance_id, course_id)
+            _json_response(self, 200, {"kind": kind, "turns": _learn_turns(course_root, kind)})
             return
         if path == "/api/preview":
             file_path = (qs.get("path") or [""])[0]
@@ -744,6 +894,9 @@ class LacertaHandler(BaseHTTPRequestHandler):
                     "task_id": inputs.get("task_id"),
                     "scenario": inputs.get("scenario"),
                     "acceptance": None,
+                    "partial_reply": "",
+                    "partial_reply_html": "",
+                    "activity": "Working",
                 },
             )
             thread = threading.Thread(

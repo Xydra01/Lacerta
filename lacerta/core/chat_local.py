@@ -86,7 +86,13 @@ def run_chat_answer(job: JobSpec, *, client: Any | None = None) -> JobResult:
         context=context,
     )
     try:
-        result = client.chat(payload, temperature=0.4)
+        delta = getattr(client, "on_delta", None)
+        result = client.chat(
+            payload,
+            temperature=0.4,
+            stream=delta is not None,
+            on_delta=delta,
+        )
     except Exception as e:
         return JobResult(
             job_id=job.job_id,

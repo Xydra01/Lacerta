@@ -206,6 +206,7 @@ WRITING_SCENARIOS: dict[str, dict[str, Any]] = {
         "hint": "Draft a short markdown document with a clear title.",
         "show_course_browser": False,
         "show_workspace_root": True,
+        "show_title": True,
     },
     "from_sources": {
         "label": "From sources",
@@ -221,6 +222,7 @@ WRITING_SCENARIOS: dict[str, dict[str, Any]] = {
         "hint": "Draft from attached notes or sources.",
         "show_course_browser": False,
         "show_workspace_root": True,
+        "show_title": False,
     },
 }
 
@@ -311,7 +313,7 @@ SURFACE_DEFAULTS: dict[str, dict[str, Any]] = {
         "hint": "",
         "show_attachments": False,
         "show_course_id": False,
-        "show_title": True,
+        "show_title": False,
         "show_code_scenario": False,
         "show_learn_scenario": False,
         "show_research_scenario": False,
@@ -333,6 +335,7 @@ def _scenario_ui_fields(meta: dict[str, Any]) -> dict[str, Any]:
         "show_workspace_root": bool(meta.get("show_workspace_root", True)),
         "show_node_id": bool(meta.get("show_node_id")),
         "require_node_id": bool(meta.get("require_node_id")),
+        "show_title": bool(meta.get("show_title")),
     }
 
 
@@ -538,7 +541,7 @@ def build_run_inputs(
         else:
             inputs["attachments"] = []
         t = (title or "").strip()
-        if t:
+        if t and scenario_meta.get("show_title"):
             inputs["title"] = t[:120]
         inputs["acceptance"] = {
             "min_deliverable_chars": 300,

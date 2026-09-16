@@ -7,6 +7,7 @@ import os
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from collections.abc import Callable
 from typing import Any
 
 
@@ -110,6 +111,7 @@ class OllamaClient:
         force_think_disabled: bool = True,
         num_ctx: int | None = None,
         num_predict: int | None = None,
+        on_delta: Callable[[str], None] | None = None,
     ) -> dict[str, Any]:
         options: dict[str, Any] = {"temperature": temperature}
         ctx = default_num_ctx() if num_ctx is None else num_ctx
@@ -138,7 +140,11 @@ class OllamaClient:
         )
         try:
             with urllib.request.urlopen(req, timeout=300) as resp:
-                raw = resp.read().decode("utf-8")
+                if stream:
+                    result = _read_ndjson_chat(resp, on_delta)
+                else:
+                    raw = resp.read().decode("utf-8")
+                    result = json.loads(raw) if raw else {}
         except urllib.error.HTTPError as e:
             body = e.read().decode("utf-8", errors="replace")
             raise RuntimeError(f"Ollama chat HTTP {e.code}: {body}") from e
@@ -147,14 +153,63 @@ class OllamaClient:
                 f"Ollama unreachable at {self.base_url}: {e}. "
                 "Start Ollama and set OLLAMA_BASE_URL / OLLAMA_MODEL."
             ) from e
-        result = json.loads(raw) if raw else {}
-        # Some thinking models leave content empty; fall back to thinking text.
-        if isinstance(result, dict):
-            msg = result.get("message")
-            if isinstance(msg, dict):
-                content = str(msg.get("content") or "").strip()
-                if not content:
-                    thinking = str(msg.get("thinking") or "").strip()
-                    if thinking:
-                        msg["content"] = thinking
-        return result
+        return _apply_thinking_fallback(result)
+
+
+def _apply_thinking_fallback(result: Any) -> dict[str, Any]:
+    """Empty content falls back to thinking on the returned dict only."""
+    if not isinstance(result, dict):
+        return {}
+    msg = result.get("message")
+    if isinstance(msg, dict):
+        content = str(msg.get("content") or "").strip()
+        if not content:
+            thinking = str(msg.get("thinking") or "").strip()
+            if thinking:
+                msg["content"] = thinking
+    return result
+
+
+def _read_ndjson_chat(resp: Any, on_delta: Callable[[str], None] | None) -> dict[str, Any]:
+    """Accumulate Ollama newline-delimited chat chunks into one dict."""
+    parts: list[str] = []
+    thinking: list[str] = []
+    role = "assistant"
+    done = False
+    while True:
+        line = resp.readline()
+        if not line:
+            break
+        if isinstance(line, bytes):
+            line = line.decode("utf-8", errors="replace")
+        text = str(line).strip()
+        if not text:
+            continue
+        try:
+            chunk = json.loads(text)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(chunk, dict):
+            continue
+        msg = chunk.get("message")
+        if isinstance(msg, dict):
+            if msg.get("role"):
+                role = str(msg["role"])
+            piece = msg.get("content")
+            if piece:
+                parts.append(str(piece))
+                if on_delta is not None:
+                    try:
+                        on_delta("".join(parts))
+                    except Exception:
+                        pass
+            think = msg.get("thinking")
+            if think:
+                thinking.append(str(think))
+        if chunk.get("done"):
+            done = True
+            break
+    message: dict[str, Any] = {"role": role, "content": "".join(parts)}
+    if thinking:
+        message["thinking"] = "".join(thinking)
+    return {"message": message, "done": done}

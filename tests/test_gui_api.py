@@ -92,6 +92,19 @@ def _poll_until_done(
     raise AssertionError(f"run {run_id} did not finish: {last}")
 
 
+def _poll_until_partial(host: str, port: int, run_id: str, *, timeout_s: float = 5.0) -> dict[str, Any]:
+    deadline = time.time() + timeout_s
+    last: dict[str, Any] = {}
+    while time.time() < deadline:
+        status, data = _request(host, port, "GET", f"/api/runs/{run_id}")
+        assert status == 200, data
+        last = data
+        if data.get("partial_reply"):
+            return data
+        time.sleep(0.05)
+    raise AssertionError(f"run {run_id} never exposed partial_reply: {last}")
+
+
 def test_api_surfaces(gui_http) -> None:
     host, port, _ = gui_http
     status, data = _request(host, port, "GET", "/api/surfaces")
@@ -103,7 +116,7 @@ def test_api_surfaces(gui_http) -> None:
     learn = next(s for s in data["surfaces"] if s["id"] == "learn")
     assert learn["show_course_id"] is True
     writing = next(s for s in data["surfaces"] if s["id"] == "writing")
-    assert writing["show_title"] is True
+    assert writing["show_title"] is False
     chat = next(s for s in data["surfaces"] if s["id"] == "chat")
     assert chat["show_workspace_root"] is False
     assert chat["cta_label"] == "Send"
@@ -324,6 +337,12 @@ def test_api_surfaces_include_code_scenarios(gui_http) -> None:
     for s in writing["writing_scenarios"]:
         assert s["cta_label"]
         assert s["goal_label"]
+    by_id = {s["id"]: s for s in writing["writing_scenarios"]}
+    assert by_id["short_draft"]["show_title"] is True
+    assert by_id["from_sources"]["show_title"] is False
+    for sid in ("chat", "code", "learn", "research"):
+        row = next(s for s in data["surfaces"] if s["id"] == sid)
+        assert row["show_title"] is False
 
 
 @patch("lacerta.gui.server.run_manager")
@@ -548,3 +567,166 @@ def test_api_quick_file_check_requires_ollama(mock_client_cls: MagicMock, gui_ht
     )
     assert status == 503
     assert "ollama" in data["error"].lower()
+
+
+@patch("lacerta.gui.server.run_manager")
+@patch("lacerta.gui.server.OllamaClient")
+def test_finished_snapshot_reply_is_not_raw_json(
+    mock_client_cls: MagicMock,
+    mock_run: MagicMock,
+    gui_http,
+) -> None:
+    host, port, root = gui_http
+    mock_client = MagicMock()
+    mock_client.health.return_value = True
+    mock_client_cls.return_value = mock_client
+
+    turn = root / "turn.json"
+    blob = {
+        "question": "What is energy?",
+        "reply": "Energy is **work** capacity.\nSee $E=mc^2$.",
+        "citations": [{"id": "c1", "text": "raw citation dump"}],
+    }
+    turn.write_text(json.dumps(blob), encoding="utf-8")
+
+    state = MagicMock()
+    state.status = "finished"
+    state.error = None
+    state.plan = ["learn_tutor"]
+    state.results = [
+        {
+            "job_id": "t1",
+            "ok": True,
+            "summary": "Tutor turn written",
+            "artifacts": [str(turn)],
+        }
+    ]
+    state.steps = 1
+    state.acceptance_ok = None
+    state.acceptance_failures = []
+    mock_run.return_value = state
+
+    status, data = _request(
+        host,
+        port,
+        "POST",
+        "/api/run",
+        {
+            "surface": "learn",
+            "goal": "What is energy?",
+            "root": str(root),
+            "scenario": "tutor",
+            "course_id": "gui-course",
+        },
+    )
+    assert status == 202
+    done = _poll_until_done(host, port, data["run_id"])
+    assert done["status"] == "finished"
+    assert done["reply"] == blob["reply"]
+    assert "citations" not in done["reply"]
+    assert done["reply"] != turn.read_text(encoding="utf-8")
+    assert "<strong>work</strong>" in done["reply_html"]
+    assert "math-inline" in done["reply_html"]
+
+
+def test_learn_turns_reads_disk_history(gui_http) -> None:
+    host, port, root = gui_http
+    course = root / "instances" / "gui" / "learn" / "courses" / "gui-course"
+    tutor = course / "tutor"
+    tutor.mkdir(parents=True)
+    turn_path = tutor / "turn_1.json"
+    turn_path.write_text(
+        json.dumps({"ts": 1, "question": "Why?", "reply": "Because **yes**."}),
+        encoding="utf-8",
+    )
+    (tutor / "tutor_history.json").write_text(
+        json.dumps({"turns": [{"ts": 1, "path": str(turn_path), "question": "Why?"}]}),
+        encoding="utf-8",
+    )
+    status, data = _request(
+        host,
+        port,
+        "GET",
+        f"/api/learn/turns?root={root}&course_id=gui-course&instance_id=gui&kind=tutor",
+    )
+    assert status == 200
+    assert [row["role"] for row in data["turns"]] == ["user", "assistant"]
+    assert data["turns"][1]["text"] == "Because **yes**."
+    assert "<strong>yes</strong>" in data["turns"][1]["text_html"]
+    assert "turn_1" not in data["turns"][1]["text"]
+
+
+@patch("lacerta.gui.server.run_manager")
+@patch("lacerta.gui.server.OllamaClient")
+def test_running_snapshot_partial_reply_clears_on_fail(
+    mock_client_cls: MagicMock,
+    mock_run: MagicMock,
+    gui_http,
+) -> None:
+    host, port, root = gui_http
+    mock_client = MagicMock()
+    mock_client.health.return_value = True
+    mock_client_cls.return_value = mock_client
+    started = threading.Event()
+    release = threading.Event()
+    bold_ready = threading.Event()
+    release_fail = threading.Event()
+
+    def fake_run(*_args, **kwargs):
+        client = kwargs["client"]
+        state = MagicMock()
+        state.status = "running"
+        state.error = None
+        state.plan = ["learn_tutor_turn"]
+        state.results = []
+        state.steps = 1
+        state.acceptance_ok = None
+        state.acceptance_failures = []
+        kwargs["on_progress"](state)
+        client.on_delta("See $E=mc")
+        started.set()
+        assert release.wait(5)
+        client.on_delta("hello **wo")
+        bold_ready.set()
+        assert release_fail.wait(5)
+        state.status = "failed"
+        state.error = "model failed"
+        return state
+
+    mock_run.side_effect = fake_run
+    status, data = _request(
+        host,
+        port,
+        "POST",
+        "/api/run",
+        {
+            "surface": "learn",
+            "goal": "What is energy?",
+            "root": str(root),
+            "scenario": "tutor",
+            "course_id": "gui-course",
+        },
+    )
+    assert status == 202
+    assert started.wait(5)
+    running = _poll_until_partial(host, port, data["run_id"])
+    assert running["partial_reply"] == "See $E=mc"
+    assert "{" not in running["partial_reply"]
+    assert "math-inline" not in running["partial_reply_html"]
+    assert "$" not in running["partial_reply_html"]
+    assert running["activity"] == "Generating reply"
+    release.set()
+    assert bold_ready.wait(5)
+    bold = _poll_until_partial(host, port, data["run_id"])
+    deadline = time.time() + 5
+    while bold.get("partial_reply") != "hello **wo" and time.time() < deadline:
+        time.sleep(0.05)
+        _status, bold = _request(host, port, "GET", f"/api/runs/{data['run_id']}")
+    assert bold["partial_reply"] == "hello **wo"
+    assert "<strong>" not in bold["partial_reply_html"]
+    assert "**wo" in bold["partial_reply_html"]
+    release_fail.set()
+    done = _poll_until_done(host, port, data["run_id"])
+    assert done["status"] == "failed"
+    assert done.get("partial_reply", "") == ""
+    assert done.get("activity", "") == ""

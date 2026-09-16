@@ -80,6 +80,29 @@ def test_run_chat_answer_passes_multi_turn_payload() -> None:
     assert result.metrics.get("prior_turns") == 2
 
 
+def test_run_chat_answer_streams_only_when_buffer_set() -> None:
+    seen: list[dict] = []
+
+    class Client:
+        def chat(self, messages, **kwargs):
+            del messages
+            seen.append(kwargs)
+            return {"message": {"content": "ok"}}
+
+    job = JobSpec(job_id="c2", job_type="chat_answer", objective="next", inputs={})
+    run_chat_answer(job, client=Client())
+    assert seen[0].get("stream") is not True
+
+    def on_delta(_text: str) -> None:
+        return None
+
+    buffered = Client()
+    buffered.on_delta = on_delta
+    run_chat_answer(job, client=buffered)
+    assert seen[1]["stream"] is True
+    assert seen[1]["on_delta"] is on_delta
+
+
 def test_manager_multi_turn_chat(tmp_path) -> None:
     class Client:
         def chat(self, messages, **kwargs):

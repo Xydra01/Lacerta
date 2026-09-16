@@ -62,3 +62,75 @@ def test_chat_sends_num_ctx_options(monkeypatch) -> None:
     assert opts["num_ctx"] == 8192
     assert opts["num_predict"] == 512
     assert captured["payload"]["think"] is False
+    assert captured["payload"]["stream"] is False
+
+
+def test_chat_stream_stitches_ndjson_and_on_delta() -> None:
+    client = OllamaClient(model="lacerta:latest")
+    lines = [
+        json.dumps({"message": {"role": "assistant", "content": "Hi"}, "done": False}),
+        json.dumps({"message": {"thinking": "secret"}, "done": False}),
+        json.dumps({"message": {"content": " there"}, "done": True}),
+    ]
+    seen: list[str] = []
+
+    class _Resp:
+        def __init__(self) -> None:
+            self._lines = [ln.encode() for ln in lines] + [b""]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def readline(self):
+            return self._lines.pop(0)
+
+    def fake_urlopen(req, timeout=0):
+        payload = json.loads(req.data.decode())
+        assert payload["stream"] is True
+        return _Resp()
+
+    with patch("urllib.request.urlopen", fake_urlopen):
+        result = client.chat(
+            [{"role": "user", "content": "hi"}],
+            stream=True,
+            on_delta=seen.append,
+        )
+
+    assert seen == ["Hi", "Hi there"]
+    assert result["message"]["content"] == "Hi there"
+    assert result["done"] is True
+    assert "secret" not in result["message"]["content"]
+
+
+def test_chat_stream_thinking_fallback_does_not_call_on_delta() -> None:
+    client = OllamaClient(model="lacerta:latest")
+    line = json.dumps(
+        {"message": {"role": "assistant", "thinking": "only think"}, "done": True}
+    )
+
+    class _Resp:
+        def __init__(self) -> None:
+            self._lines = [line.encode(), b""]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def readline(self):
+            return self._lines.pop(0)
+
+    def boom(_text: str) -> None:
+        raise RuntimeError("callback must not fail the chat")
+
+    with patch("urllib.request.urlopen", lambda req, timeout=0: _Resp()):
+        result = client.chat(
+            [{"role": "user", "content": "hi"}],
+            stream=True,
+            on_delta=boom,
+        )
+    assert result["message"]["content"] == "only think"

@@ -1,6 +1,7 @@
 # Phase V3.1 — Replies panel + formatting
 
-**Status:** planned  
+**Status:** done  
+**Shipped:** formatter is `lacerta/gui/format_reply.py` (`closed_prefix`, `render_html`); the browser inserts `reply_html` and typesets with vendored temml. Chat history stays in memory; Tutor/Archive history is the existing disk index via `GET /api/learn/turns`.  
 **Depends on:** V3.0  
 **Exit:** Chat, Tutor, and Archive replies appear in a dedicated conversation panel with history; newlines, `*italic*`, `**bold**`, and `$…$` / `$$…$$` math render; users do not have to open raw JSON artifacts to read an answer  
 
@@ -36,13 +37,13 @@ Artifact list + Preview stay for disk debugging. They are not the conversation U
 
 ## Checkboxes
 
-- [ ] `#replies` section: scrollable history, user vs assistant labels, newest at bottom
-- [ ] Chat turns render in that panel (not only a pre-wrap dump)
-- [ ] Tutor and Archive successful runs append the synthesized (or paste) reply without clicking Artifacts
-- [ ] Safe HTML (escape first); newlines, bold, italic, code work
-- [ ] Math `$` / `$$` renders locally; failure falls back to source text
-- [ ] Preview/artifacts still work for raw JSON
-- [ ] Unit or static fixture test for the formatter (bold, italic, newline, math delimiters preserved or rendered) — extract a small pure function so pytest can cover it without a browser if practical; otherwise a documented manual check plus a JS-free Python twin of the escape rules is not required if the function lives in JS — prefer a tiny Python-free check in existing GUI tests only for payload shape (`reply` exposed on run result)
+- [x] `#replies` section: scrollable history, user vs assistant labels, newest at bottom
+- [x] Chat turns render in that panel (not only a pre-wrap dump)
+- [x] Tutor and Archive successful runs append the synthesized (or paste) reply without clicking Artifacts
+- [x] Safe HTML (escape first); newlines, bold, italic, code work
+- [x] Math `$` / `$$` renders locally; failure falls back to source text
+- [x] Preview/artifacts still work for raw JSON
+- [x] Unit or static fixture test for the formatter (bold, italic, newline, math delimiters preserved or rendered) — extract a small pure function so pytest can cover it without a browser if practical; otherwise a documented manual check plus a JS-free Python twin of the escape rules is not required if the function lives in JS — prefer a tiny Python-free check in existing GUI tests only for payload shape (`reply` exposed on run result)
 
 ---
 
@@ -70,9 +71,9 @@ Manual: Tutor question → answer visible in Replies with a line break and bold;
 
 ## Architecture PR checklist
 
-- [ ] No second transcript store that diverges from disk turns
-- [ ] HTML escaped before markdown
-- [ ] Math assets local
+- [x] No second transcript store that diverges from disk turns
+- [x] HTML escaped before markdown
+- [x] Math assets local
 
 ---
 

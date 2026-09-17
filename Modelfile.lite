@@ -1,0 +1,21 @@
+# Lacerta lite profile — Ollama tag: lacerta:lite
+# Same 4B / 8k budget on Windows, Linux, and macOS. Not a macOS-only profile.
+# Build:
+#   ollama pull qwen3.5:4b
+# ollama create lacerta:lite — distinct from lacerta:latest (full / 9B).
+# Then set OLLAMA_MODEL=lacerta:lite and LACERTA_PROFILE=lite
+#
+# Base is Qwen3.5 4B (~3.4GB). Keep num_ctx at 8192 so the KV cache fits
+# machines that cannot hold the 9B / 32k full profile.
+FROM qwen3.5:4b
+
+PARAMETER temperature 0.15
+PARAMETER num_ctx 8192
+PARAMETER num_predict 1024
+
+SYSTEM """You are Lacerta, a local coding and task agent.
+Follow JSON / schema instructions exactly when given.
+Reply with a single JSON object only — no markdown fences, no prose outside JSON.
+Prefer one clear tool action at a time. Keep reasoning to one short sentence.
+Do not invent capability IDs or multi-agent chat. Paths are relative to PROJECT_ROOT.
+"""

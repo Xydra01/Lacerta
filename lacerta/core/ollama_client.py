@@ -20,15 +20,20 @@ def _model() -> str:
 
 
 def default_num_ctx() -> int:
-    """Context window for chat options. Mac 8GB profile defaults to 8k."""
+    """Context window for chat options.
+
+    ``OLLAMA_NUM_CTX`` wins. Otherwise the active profile decides: lite/macos
+    is 8192, full (default) is 32768.
+    """
     raw = os.getenv("OLLAMA_NUM_CTX", "").strip()
     if raw:
         try:
             return max(1024, min(131072, int(raw)))
         except ValueError:
             pass
-    # devMacOS / 8GB Apple Silicon: keep KV cache modest by default.
-    return 8192
+    from lacerta.core.profile import default_num_ctx as profile_ctx
+
+    return profile_ctx()
 
 
 def default_num_predict() -> int | None:
@@ -51,13 +56,16 @@ class ModelCheckResult:
     unknown: bool = True
 
 
-# Harness-verified / intended Lacerta tags (including Mac 4B rebuild of lacerta:latest).
+# Harness-verified / intended Lacerta tags.
+# lacerta:latest is the full 9B build; lacerta:lite is the 4B / 8k build.
 CAPABLE_MODELS = frozenset(
     {
         "lacerta",
         "lacerta:latest",
+        "lacerta:lite",
         "lacerta:macos",
         "qwen3.5:4b",
+        "qwen3.5:9b",
         "qwen3.5:4b-mlx",
     }
 )

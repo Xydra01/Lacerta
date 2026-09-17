@@ -1,63 +1,28 @@
-# Lacerta on macOS (Apple Silicon, 8GB)
+# macOS notes (8GB Apple Silicon)
 
-**Branch profile:** `devMacOS`  
-**Hardware target:** 2023 MacBook Air M2, 8GB unified memory  
-**Model target:** Qwen3.5 **4B** via Ollama (`lacerta:latest`)
+The product is the same on Windows, Linux, and macOS. An 8GB Mac uses the **lite** profile — the same 4B / 8k budget as a small Windows or Linux machine. Do not set a separate macOS model.
 
-**Full install & first-run walkthrough:** [getting-started.md](getting-started.md)
+Full install steps: [getting-started.md](getting-started.md).
 
-This profile keeps the same Supervisor–Worker contracts, flat tool JSON schema, and harness gates as mainline Lacerta. The changes are sizing and Mac ergonomics so the stack stays usable without swapping.
+| Setting | full | lite (use this on 8GB) |
+|---------|------|------------------------|
+| Base model | `qwen3.5:9b` | `qwen3.5:4b` |
+| Ollama tag | `lacerta:latest` | `lacerta:lite` |
+| `num_ctx` | 32768 | 8192 |
+| Env file | `.env.example` | `.env.lite.example` |
+| `LACERTA_PROFILE` | `full` | `lite` |
 
----
+`LACERTA_PROFILE=macos` is accepted as an alias of `lite` so an older `.env` still applies the small budget. New Mac setups should say `lite`.
 
-## Why 4B (not 9B)
+## Why 4B on 8GB
 
-| Setting | Mainline (larger hosts) | macOS 8GB profile |
-|---------|-------------------------|-------------------|
-| Base model | `qwen3.5:9b` (~6.6GB) | `qwen3.5:4b` (~3.4GB) |
-| `num_ctx` | 32768 | **8192** |
-| Tool output cap | 6000 | **4000** |
-| Write char cap | 8000 | **6000** |
+A 9B model plus a 32k KV cache contends with macOS and a browser on 8GB unified memory. Staying in the Qwen3.5 family keeps the same prompts and schemas.
 
-A 9B model plus a large KV cache will contend with macOS and Chrome on 8GB unified memory. Staying in the Qwen3.5 family preserves prompt/schema habits while fitting RAM. Structured output still goes through Ollama `format=` + the flat worker schema (see `lacerta/core/schema.py`).
+Optional tighter RAM: `qwen3.5:2b` (more JSON retries). Optional spare RAM: `qwen3.5:4b-mlx` — change `FROM` in `Modelfile.lite` if you try it. Neither is the default.
 
-**Optional (tighter RAM):** `qwen3.5:2b` — expect more JSON retries; not the default.  
-**Optional (spare RAM / closed apps):** `qwen3.5:4b-mlx` — Apple MLX build; rebuild Modelfile `FROM` line if you try it.
+## Memory tips
 
----
-
-## Setup & run
-
-Use **[getting-started.md](getting-started.md)** for the full path (CLT, Homebrew, Ollama, venv, model, GUI, gates).
-
-Short form:
-
-```bash
-git checkout devMacOS
-python3 -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
-./scripts/setup-macos.sh
-python3 -m lacerta.gui   # http://127.0.0.1:8765/
-```
-
----
-
-## Memory tips (M2 8GB)
-
-1. Quit unused browsers / Electron apps before long code smokes.
-2. Keep `OLLAMA_NUM_CTX=8192` unless you have headroom (`ollama ps` should stay GPU-resident).
-3. Leave `LACERTA_LLM_DECOMPOSE=0` — templates are the default path.
-4. Prefer `python3` / the venv interpreter; habit tests resolve via `sys.executable` on this branch.
-
----
-
-## Syncing from `main`
-
-When main moves, rebase or merge into `devMacOS`, then re-check:
-
-- `Modelfile` still `FROM qwen3.5:4b` with `num_ctx 8192`
-- `.env.example` Mac caps
-- `docs/macos.md` still accurate
-
-Do not silently reintroduce a 9B default on this branch.
+1. Quit unused browsers before long code runs.
+2. Keep `OLLAMA_NUM_CTX=8192`.
+3. Leave `LACERTA_LLM_DECOMPOSE=0`.
+4. Use the venv interpreter (`python` or `python3`).

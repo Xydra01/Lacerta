@@ -40,11 +40,15 @@ def _max_turns() -> int:
 
 
 def tool_output_max_chars() -> int:
-    raw = os.getenv("LACERTA_TOOL_OUTPUT_CHAR_CAP", "6000").strip()
+    from lacerta.core.profile import default_tool_output_chars
+
+    raw = os.getenv("LACERTA_TOOL_OUTPUT_CHAR_CAP", "").strip()
+    if not raw:
+        return default_tool_output_chars()
     try:
         return max(256, int(raw))
     except ValueError:
-        return 6000
+        return default_tool_output_chars()
 
 
 def truncate_text(text: str, max_chars: int) -> str:

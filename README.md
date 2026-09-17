@@ -1,66 +1,80 @@
 # Lacerta
 
-Lacerta is a local-first AI agent framework: a stateful **manager** that plans, dispatches, and grades; ephemeral **workers** that execute one typed job with a tiny tool set or a Python recipe. Surfaces (chat, code, learn, research, writing) pick templates and allowlists.
+Lacerta is a local-first AI agent framework: a stateful **manager** that plans, dispatches, and grades; ephemeral **workers** that execute one typed job with a tiny tool set or a Python recipe. Surfaces (chat, code, learn, research, writing) pick templates and allowlists. The same code runs on **Windows, Linux, and macOS**.
 
-**Version:** **v0 complete** (L0–L8). **v1 exit met** (V1.0–V1.5). **v2 exit met** (V2.0–V2.5). MCP/Remote (former L9–L12) remain **deferred**.
+**Version:** **v0 complete** (L0–L8). **v1 exit met**. **v2 exit met**. **v3 exit met** (replies, activity, themes). MCP/Remote (L9–L12) remain **deferred**.
 
-**This branch (`devMacOS`):** Apple Silicon profile for a **2023 MacBook Air M2 / 8GB** — Ollama base **`qwen3.5:4b`**, 8k context.
+## Profiles
+
+| Profile | Who | Model | Context |
+|---------|-----|--------|---------|
+| **full** (default) | Machines that can hold a 9B model | `qwen3.5:9b` → `lacerta:latest` | 32768 |
+| **lite** | Windows, Linux, or macOS with less RAM (including an 8GB laptop) | `qwen3.5:4b` → `lacerta:lite` | 8192 |
+
+Lite is not a macOS-only switch. Set `LACERTA_PROFILE=lite`. An older `LACERTA_PROFILE=macos` value is accepted as an alias so an existing Mac `.env` still uses the small budget.
 
 ## Start here
 
-**[Getting started (full Mac setup)](docs/getting-started.md)** — install tools, clone, model, GUI, first runs, troubleshooting.
+**[Getting started](docs/getting-started.md)** — Windows, Linux, and macOS install, full vs lite, GUI, first runs.
 
 ## Docs
 
-- [Getting started](docs/getting-started.md) — **full start-to-finish setup**
-- [macOS / M2 8GB profile](docs/macos.md) — memory/model rationale
-- [Architecture v1](docs/architecture-v1.md) — v1 exit baseline  
-- [Architecture v2](docs/architecture-v2.md) — **v2 exit met** (Learn UX / LLM tutoring / Archive)
-- [Architecture v3](docs/architecture-v3.md) — planned UI polish (replies, formatting, themes)  
-- [Architecture (Supervisor–Worker blueprint)](lacerta-supervisor-worker-viability.md)
-- [Port kit (CodeWorker, IPC, harness)](lacerta-port-kit.md)
-- [Surfaces & recipes](lacerta-surfaces-and-recipes.md)
-- [Implementation phases](docs/phases/README.md)
+- [Getting started](docs/getting-started.md)
+- [macOS hardware notes](docs/macos.md) — 8GB Apple Silicon uses the **lite** profile
+- [Architecture v1](docs/architecture-v1.md) · [v2](docs/architecture-v2.md) · [v3](docs/architecture-v3.md)
+- [Phases](docs/phases/README.md)
+- [GUI](lacerta/gui/README.md)
 
-## Quick setup (macOS)
+## Quick setup
+
+Install [Ollama](https://ollama.com) and Python 3.11+, then:
 
 ```bash
-git checkout devMacOS
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-cp .env.example .env
-./scripts/setup-macos.sh   # pulls qwen3.5:4b and builds lacerta:latest
-python3 -m lacerta.gui     # http://127.0.0.1:8765/
+python -m venv .venv
 ```
 
-Requires [Ollama](https://ollama.com) (App or `brew install --cask ollama`). Details, gates, and troubleshooting: [docs/getting-started.md](docs/getting-started.md).
+- **Windows (cmd):** `.venv\Scripts\activate`
+- **Windows (PowerShell):** `.venv\Scripts\Activate.ps1`
+- **Linux / macOS:** `source .venv/bin/activate`
 
-### Larger hosts (not this branch’s default)
+```bash
+pip install -e ".[dev]"
+```
 
-Mainline historically used `qwen3.5:9b` + 32k context. Do **not** use that Modelfile on 8GB Macs.
+**Full profile**
 
-## Verify (v1 regression bar)
+```bash
+# Windows: copy .env.example .env
+cp .env.example .env
+ollama pull qwen3.5:9b
+ollama create lacerta -f Modelfile
+python -m lacerta.gui
+```
+
+**Lite profile** (4B, 8k — Windows, Linux, or macOS)
+
+```bash
+# Windows: copy .env.lite.example .env
+cp .env.lite.example .env
+# Linux / macOS / Git Bash:
+./scripts/setup-lite.sh
+# Windows PowerShell:
+# powershell -ExecutionPolicy Bypass -File scripts/setup-lite.ps1
+python -m lacerta.gui
+```
+
+Open http://127.0.0.1:8765/
+
+## Verify
 
 ```bash
 pytest tests/ -q
-LACERTA_HABIT_MODE=deterministic ./scripts/gate.sh habit_tracker --runs 1
-./scripts/gate.sh writing_short --runs 1
-./scripts/gate.sh writing_from_sources --runs 1
-./scripts/gate.sh research_local --runs 1
-./scripts/gate.sh research_corpus_bulk --runs 1
-./scripts/gate.sh learn_syllabus_files --runs 1
-./scripts/gate.sh learn_corpus_retrieve --runs 1
-python3 -m lacerta.gui
-# when Ollama is up:
-./scripts/gate.sh smoke_write_file --runs 1
 ```
 
-Templates remain the default path. Optional LLM manager decompose is off unless
-`LACERTA_LLM_DECOMPOSE=1` (keep narrow for local models; see `.env.example`).
+Harness gates (Git Bash or Linux/macOS). On Windows without Bash, the same entry point is `python -m lacerta.harness.gate`.
 
-## What’s next
-
-**v1 exit is met.** MCP/Remote (L9–L12) stay deferred until deliberately resumed. See [docs/architecture-v1.md](docs/architecture-v1.md) §6.1.
-
-On `devMacOS`, when syncing from `main`, re-validate the Mac memory/model profile before merging feature work.
+```bash
+./scripts/gate.sh habit_tracker --runs 1
+./scripts/gate.sh writing_short --runs 1
+./scripts/gate.sh learn_syllabus_files --runs 1
+```

@@ -42,11 +42,15 @@ def get_project_root() -> Path | None:
 
 
 def _max_write_chars() -> int:
-    raw = os.getenv("LACERTA_MAX_WRITE_CHARS", "8000").strip()
+    from lacerta.core.profile import default_write_chars
+
+    raw = os.getenv("LACERTA_MAX_WRITE_CHARS", "").strip()
+    if not raw:
+        return default_write_chars()
     try:
         return max(1, int(raw))
     except ValueError:
-        return 8000
+        return default_write_chars()
 
 
 def _require_project_root() -> Path | str:

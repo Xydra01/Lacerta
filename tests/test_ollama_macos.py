@@ -12,8 +12,13 @@ from lacerta.core.ollama_client import (
 )
 
 
-def test_default_num_ctx_macos_budget(monkeypatch) -> None:
+def test_default_num_ctx_follows_profile(monkeypatch) -> None:
     monkeypatch.delenv("OLLAMA_NUM_CTX", raising=False)
+    monkeypatch.delenv("LACERTA_PROFILE", raising=False)
+    assert default_num_ctx() == 32768
+    monkeypatch.setenv("LACERTA_PROFILE", "lite")
+    assert default_num_ctx() == 8192
+    monkeypatch.setenv("LACERTA_PROFILE", "macos")
     assert default_num_ctx() == 8192
     monkeypatch.setenv("OLLAMA_NUM_CTX", "4096")
     assert default_num_ctx() == 4096

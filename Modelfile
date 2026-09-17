@@ -1,22 +1,14 @@
-# Lacerta macOS profile — Ollama tag: lacerta:latest
-# Target: Apple Silicon M2 / 8GB unified memory (2023 MacBook Air class)
-# Build:
-#   ollama pull qwen3.5:4b
-#   ollama create lacerta -f Modelfile
-#
-# Base is Qwen3.5 4B (~3.4GB) — same family as the 9B default on larger hosts,
-# chosen for structured JSON / tool-turn reliability within an 8GB RAM budget.
-# Keep num_ctx modest: 32k KV cache will thrash 8GB unified memory.
-FROM qwen3.5:4b
+# Lacerta worker/manager base model — Ollama tag: lacerta:latest
+# Build: ollama create lacerta -f Modelfile
+# Profile: full (larger hosts). Low-RAM Windows/Linux/macOS: use Modelfile.lite.
+FROM qwen3.5:9b
 
-PARAMETER temperature 0.15
-PARAMETER num_ctx 8192
-PARAMETER num_predict 1024
+PARAMETER temperature 0.2
+PARAMETER num_ctx 32768
 
 # Prefer concise structured tool JSON over long chain-of-thought novels.
-SYSTEM """You are Lacerta, a local coding and task agent on Apple Silicon.
+SYSTEM """You are Lacerta, a local coding and task agent.
 Follow JSON / schema instructions exactly when given.
-Reply with a single JSON object only — no markdown fences, no prose outside JSON.
-Prefer one clear tool action at a time. Keep reasoning to one short sentence.
+Prefer one clear tool action at a time. Keep reasoning short.
 Do not invent capability IDs or multi-agent chat. Paths are relative to PROJECT_ROOT.
 """

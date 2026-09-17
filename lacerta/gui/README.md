@@ -5,9 +5,10 @@ Local stdlib HTTP UI (`http.server`) that calls `run_manager` in-process. Not a 
 ## Run
 
 ```bash
-python3 -m lacerta.gui
+python -m lacerta.gui
+# Windows, Linux, or macOS. python3 works where that is the interpreter name.
 # optional:
-python3 -m lacerta.gui --host 127.0.0.1 --port 8765
+python -m lacerta.gui --host 127.0.0.1 --port 8765
 ```
 
 Open http://127.0.0.1:8765/

@@ -63,14 +63,18 @@ def _writing_mode() -> str:
     return os.getenv("LACERTA_WRITING_MODE", "deterministic").strip().lower() or "deterministic"
 
 
+def _scratch_excerpt(draft: dict[str, Any], *, limit: int = 280) -> str:
+    scratch = str(draft.get("scratch") or "").strip()
+    if not scratch:
+        return ""
+    return " ".join(scratch.split())[:limit]
+
+
 def _deterministic_sections(ctx: CapabilityContext, brief: WritingBrief) -> list[dict[str, str]]:
     topic = str(ctx.extra.get("topic") or ctx.user_request or brief.title or "Topic")
     data_root, task_id = _roots(ctx)
     draft = storage.load_draft(data_root, task_id) or {}
-    scratch = str(draft.get("scratch") or "").strip()
-    excerpt = ""
-    if scratch:
-        excerpt = scratch.replace("\n", " ")[:280]
+    excerpt = _scratch_excerpt(draft)
     p1 = (
         f"This short draft introduces {topic}. Local-first agents keep inference "
         f"and tools on the user's machine so acceptance can be judged against disk "
@@ -78,9 +82,7 @@ def _deterministic_sections(ctx: CapabilityContext, brief: WritingBrief) -> list
         f"the filesystem remains the source of truth for edits."
     )
     if excerpt:
-        p1 = (
-            f"{p1} Source excerpt: {excerpt}"
-        )
+        p1 = f"{p1} Source excerpt: {excerpt}"
     p2 = (
         f"Lacerta's writing surface uses a Python recipe runner: draft sections into "
         f"a buffer, compile a single markdown title with section headings, then "
@@ -93,6 +95,87 @@ def _deterministic_sections(ctx: CapabilityContext, brief: WritingBrief) -> list
         {"header": "Introduction", "body": p1},
         {"header": "Approach", "body": p2},
     ]
+
+
+def _llm_sections(
+    ctx: CapabilityContext,
+    brief: WritingBrief,
+    draft: dict[str, Any],
+) -> list[dict[str, str]] | None:
+    """Ask the model for sections. Returns None on failure so the caller can fall back."""
+    if ctx.client is None:
+        return None
+    topic = str(ctx.extra.get("topic") or ctx.user_request or brief.title or "Topic")
+    # Larger excerpt for LLM than the deterministic paste; still bounded for 8k ctx.
+    sources = _scratch_excerpt(draft, limit=3500)
+    user_bits = [
+        f"Goal / topic: {topic}",
+        f"Working title: {brief.title or draft.get('title') or 'Draft'}",
+    ]
+    if sources:
+        user_bits.append(
+            "Write a clear markdown draft grounded in these sources. "
+            "Do not invent facts that are not supported by the sources.\n\n"
+            f"SOURCES:\n{sources}"
+        )
+    else:
+        user_bits.append("Write a clear short markdown draft for the goal above.")
+    try:
+        result = ctx.client.chat(
+            [
+                {
+                    "role": "system",
+                    "content": (
+                        "You are Lacerta's writing worker. Return JSON only with "
+                        "title and two or three sections (header + body). "
+                        "Bodies are plain paragraphs, no markdown headings inside body. "
+                        "When SOURCES are present, rewrite for technical depth, flow, "
+                        "and grammar using those sources."
+                    ),
+                },
+                {"role": "user", "content": "\n\n".join(user_bits)},
+            ],
+            temperature=0.4,
+            format={
+                "type": "object",
+                "properties": {
+                    "title": {"type": "string"},
+                    "sections": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "header": {"type": "string"},
+                                "body": {"type": "string"},
+                            },
+                        },
+                    },
+                },
+            },
+        )
+        import json
+
+        raw = str(result.get("message", {}).get("content") or "")
+        data = json.loads(raw)
+        if not isinstance(data, dict) or not data.get("sections"):
+            return None
+        sections = [
+            {
+                "header": storage.strip_heading_marks(str(s.get("header") or "Section")),
+                "body": storage.strip_heading_marks(str(s.get("body") or "")),
+            }
+            for s in data["sections"]
+            if isinstance(s, dict)
+        ]
+        if not sections:
+            return None
+        title = storage.strip_heading_marks(
+            str(data.get("title") or draft.get("title") or brief.title or "Draft")
+        )
+        draft["title"] = title
+        return sections
+    except Exception:
+        return None
 
 
 def ingest_sources(ctx: CapabilityContext, inp: IngestInput) -> CapabilityResult:
@@ -147,65 +230,17 @@ def draft_sections(ctx: CapabilityContext, inp: DraftSectionInput) -> Capability
         header = storage.strip_heading_marks(inp.section_header or "Section")
         body = storage.strip_heading_marks(inp.section_body or "")
         draft.setdefault("sections", []).append({"header": header, "body": body})
-    elif (
-        brief.scope == "from_sources"
-        or _writing_mode() == "deterministic"
-        or not ctx.client
-    ):
-        if not draft.get("sections"):
-            draft["title"] = storage.strip_heading_marks(
-                brief.title or ctx.user_request or "Writing Draft"
-            )
-            draft["sections"] = _deterministic_sections(ctx, brief)
-    else:
-        # Optional LLM path: fall back to deterministic if anything fails
-        try:
-            result = ctx.client.chat(
-                [
-                    {
-                        "role": "system",
-                        "content": "Write two short markdown section bodies as JSON.",
-                    },
-                    {"role": "user", "content": ctx.user_request or brief.title},
-                ],
-                temperature=0.4,
-                format={
-                    "type": "object",
-                    "properties": {
-                        "title": {"type": "string"},
-                        "sections": {
-                            "type": "array",
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "header": {"type": "string"},
-                                    "body": {"type": "string"},
-                                },
-                            },
-                        },
-                    },
-                },
-            )
-            import json
-
-            raw = str(result.get("message", {}).get("content") or "")
-            data = json.loads(raw)
-            if isinstance(data, dict) and data.get("sections"):
-                draft["title"] = storage.strip_heading_marks(
-                    str(data.get("title") or draft.get("title") or "Draft")
-                )
-                draft["sections"] = [
-                    {
-                        "header": storage.strip_heading_marks(str(s.get("header") or "Section")),
-                        "body": storage.strip_heading_marks(str(s.get("body") or "")),
-                    }
-                    for s in data["sections"]
-                    if isinstance(s, dict)
-                ]
-            else:
-                draft["sections"] = _deterministic_sections(ctx, brief)
-        except Exception:
-            draft["sections"] = _deterministic_sections(ctx, brief)
+    elif not draft.get("sections"):
+        draft["title"] = storage.strip_heading_marks(
+            brief.title or ctx.user_request or "Writing Draft"
+        )
+        use_llm = _writing_mode() == "llm" and ctx.client is not None
+        sections: list[dict[str, str]] | None = None
+        if use_llm:
+            sections = _llm_sections(ctx, brief, draft)
+        if not sections:
+            sections = _deterministic_sections(ctx, brief)
+        draft["sections"] = sections
 
     path = storage.save_draft(data_root, task_id, draft)
     return CapabilityResult.success(

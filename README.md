@@ -14,6 +14,7 @@ Lacerta is a local-first AI agent framework: a stateful **manager** that plans, 
 
 - [Getting started](docs/getting-started.md) — **full start-to-finish setup**
 - [macOS / M2 8GB profile](docs/macos.md) — memory/model rationale
+- [Bonsai 2 27B assessment](docs/research-bonsai-2-27b.md) — research note (not a drop-in on 8GB / Ollama)
 - [Architecture v1](docs/architecture-v1.md) — v1 exit baseline  
 - [Architecture v2](docs/architecture-v2.md) — **v2 exit met** (Learn UX / LLM tutoring / Archive)
 - [Architecture v3](docs/architecture-v3.md) — planned UI polish (replies, formatting, themes)  

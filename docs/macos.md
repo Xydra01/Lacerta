@@ -24,6 +24,8 @@ A 9B model plus a large KV cache will contend with macOS and Chrome on 8GB unifi
 **Optional (tighter RAM):** `qwen3.5:2b` — expect more JSON retries; not the default.  
 **Optional (spare RAM / closed apps):** `qwen3.5:4b-mlx` — Apple MLX build; rebuild Modelfile `FROM` line if you try it.
 
+Larger **27B-class** packs such as Ternary Bonsai 2 are researched in [research-bonsai-2-27b.md](research-bonsai-2-27b.md). They are not a drop-in for this 8GB / Ollama profile.
+
 ---
 
 ## Setup & run
